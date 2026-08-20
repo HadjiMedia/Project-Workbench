@@ -18,9 +18,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose, onRes
         app: 'Workbench Diagnostics & Repair Console',
         version: '3.0.0',
         exportedAt: new Date().toISOString(),
+        users: JSON.parse(localStorage.getItem('wb_users') || '[]'),
+        auditLogs: JSON.parse(localStorage.getItem('wb_audit_logs') || '[]'),
         tickets: JSON.parse(localStorage.getItem('wb_repair_tickets') || '[]'),
         shopSettings: JSON.parse(localStorage.getItem('wb_shop_settings') || '{}'),
         kbArticles: JSON.parse(localStorage.getItem('wb_kb_articles') || '[]'),
+        vaultPinHash: localStorage.getItem('wb_vault_pin_hash') || null,
         customBoardImg: localStorage.getItem('wb_custom_board_img') || null
       };
 
@@ -34,7 +37,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose, onRes
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setStatusMsg({ type: 'ok', text: 'Backup JSON downloaded successfully!' });
+      setStatusMsg({ type: 'ok', text: 'Complete system backup JSON downloaded successfully!' });
     } catch (e: any) {
       setStatusMsg({ type: 'err', text: `Export failed: ${e.message}` });
     }
@@ -48,15 +51,20 @@ export const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose, onRes
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result as string);
-        if (data.tickets) localStorage.setItem('wb_repair_tickets', JSON.stringify(data.tickets));
-        if (data.shopSettings) localStorage.setItem('wb_shop_settings', JSON.stringify(data.shopSettings));
-        if (data.kbArticles) localStorage.setItem('wb_kb_articles', JSON.stringify(data.kbArticles));
+        if (data.users && Array.isArray(data.users)) localStorage.setItem('wb_users', JSON.stringify(data.users));
+        if (data.auditLogs && Array.isArray(data.auditLogs)) localStorage.setItem('wb_audit_logs', JSON.stringify(data.auditLogs));
+        if (data.tickets && Array.isArray(data.tickets)) localStorage.setItem('wb_repair_tickets', JSON.stringify(data.tickets));
+        if (data.shopSettings && typeof data.shopSettings === 'object') localStorage.setItem('wb_shop_settings', JSON.stringify(data.shopSettings));
+        if (data.kbArticles && Array.isArray(data.kbArticles)) localStorage.setItem('wb_kb_articles', JSON.stringify(data.kbArticles));
+        if (data.vaultPinHash) localStorage.setItem('wb_vault_pin_hash', data.vaultPinHash);
         if (data.customBoardImg) localStorage.setItem('wb_custom_board_img', data.customBoardImg);
 
-        setStatusMsg({ type: 'ok', text: 'All data, tickets, and knowledge bases restored!' });
-        onRestoreComplete();
+        setStatusMsg({ type: 'ok', text: 'All system configurations, tickets, users, and audit logs restored!' });
+        setTimeout(() => {
+          onRestoreComplete();
+        }, 600);
       } catch (err: any) {
-        setStatusMsg({ type: 'err', text: 'Invalid JSON backup file structure.' });
+        setStatusMsg({ type: 'err', text: 'Invalid JSON backup file format.' });
       }
     };
     reader.readAsText(file);

@@ -65,7 +65,7 @@ export const SerialMonitor: React.FC = () => {
   // Connect via Web Serial API
   const handleConnectSerial = async () => {
     if (!hasWebSerial) {
-      alert('Web Serial API is not supported in this browser. Use Chrome or Edge, or try the Hardware Simulator Mode.');
+      appendLog('error', 'Web Serial API is not supported in this browser. Use Chrome/Edge, or use the Hardware Simulator Mode.');
       return;
     }
 

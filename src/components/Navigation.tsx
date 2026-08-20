@@ -99,18 +99,18 @@ export const Navigation: React.FC<NavigationProps> = ({
         { id: 'shortcuts', label: 'Shortcut Suite', icon: Keyboard },
       ]
     },
-    {
+    ...(currentUser?.role === 'admin' ? [{
       title: 'ADMINISTRATION',
       items: [
         { 
-          id: 'admin', 
+          id: 'admin' as TabId, 
           label: 'Admin & Security Center', 
           icon: ShieldCheck,
           badge: pendingUsersCount > 0 ? `${pendingUsersCount} PENDING` : undefined,
           badgeColor: 'bg-amber-500 text-slate-950 font-bold animate-pulse'
         },
       ]
-    }
+    }] : [])
   ];
 
   const handleSelect = (tab: TabId) => {

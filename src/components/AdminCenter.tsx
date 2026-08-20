@@ -28,6 +28,21 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
+  // Security Verification Guard
+  if (!currentUser || currentUser.role !== 'admin') {
+    return (
+      <div className="p-8 rounded-2xl bg-[#0e121a] border border-rose-500/30 text-center space-y-4 max-w-2xl mx-auto my-8">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 mx-auto flex items-center justify-center">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-white font-['Space_Grotesk']">Access Restricted: Administrator Privileges Required</h2>
+        <p className="text-xs text-slate-400 font-mono">
+          Your current account ({currentUser?.fullName || 'Guest'} · {currentUser?.techCallsign || 'TECH-00'}) has role <span className="text-amber-400 font-bold uppercase">{currentUser?.role || 'BENCH_TECH'}</span>. Only authorized administrators can access user approval and security audit logs.
+        </p>
+      </div>
+    );
+  }
+
   // Audit Log State
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [auditSeverityFilter, setAuditSeverityFilter] = useState<string>('All');

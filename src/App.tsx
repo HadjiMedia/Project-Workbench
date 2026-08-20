@@ -102,11 +102,25 @@ export function App() {
   const [isVaultUnlocked, setIsVaultUnlocked] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
-  // Sync tab change
+  // Sync tab change with strict RBAC enforcement
   const handleTabChange = useCallback((tab: TabId) => {
+    if (tab === 'admin' && currentUser?.role !== 'admin') {
+      // Prevent non-admin users from switching to admin tab
+      setActiveTab('overview');
+      localStorage.setItem('wb_active_tab', 'overview');
+      return;
+    }
     setActiveTab(tab);
     localStorage.setItem('wb_active_tab', tab);
-  }, []);
+  }, [currentUser]);
+
+  // Ensure non-admins are immediately redirected away from admin tab if permissions change
+  useEffect(() => {
+    if (activeTab === 'admin' && currentUser?.role !== 'admin') {
+      setActiveTab('overview');
+      localStorage.setItem('wb_active_tab', 'overview');
+    }
+  }, [currentUser, activeTab]);
 
   // Open ticket directly in Invoice Generator
   const handleOpenTicketInvoice = (ticket: JobTicket) => {
@@ -193,7 +207,7 @@ export function App() {
   }, []);
 
   const pendingCount = users.filter(u => u.status === 'pending').length;
-  const openTicketsCount = tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length;
+  const openTicketsCount = tickets.filter(t => t.status !== 'Completed' && t.status !== 'Cancelled').length;
 
   // Strict Authentication Gate
   if (!currentUser) {
@@ -287,8 +301,8 @@ export function App() {
           )}
           {activeTab === 'shortcuts' && <ShortcutHub />}
 
-          {/* Administration & Security */}
-          {activeTab === 'admin' && (
+          {/* Administration & Security (Strict Admin Role Required) */}
+          {activeTab === 'admin' && currentUser?.role === 'admin' && (
             <AdminCenter
               currentUser={currentUser}
               users={users}
@@ -328,6 +342,7 @@ export function App() {
         isOpen={isCmdkOpen}
         onClose={() => setIsCmdkOpen(false)}
         onNavigate={handleTabChange}
+        isAdmin={currentUser?.role === 'admin'}
       />
 
       <VaultModal

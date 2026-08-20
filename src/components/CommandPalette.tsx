@@ -11,6 +11,7 @@ interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: TabId) => void;
+  isAdmin?: boolean;
 }
 
 interface SearchItem {
@@ -19,9 +20,10 @@ interface SearchItem {
   subtitle: string;
   category: string;
   tab: TabId;
+  adminOnly?: boolean;
 }
 
-export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, onNavigate }) => {
+export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, onNavigate, isAdmin = false }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,13 +37,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   }, [isOpen]);
 
   // Build searchable index
-  const items: SearchItem[] = [
+  const allItems: SearchItem[] = [
     // Primary Tab Shortcuts
     { id: 'tab_overview', title: 'Overview Dashboard & Operations Summary', subtitle: 'Pending technician registrations, active repair queue & critical audit logs', category: 'Overview', tab: 'overview' },
     { id: 'tab_qr', title: 'QR Code Diagnostic & Asset Tag Suite', subtitle: 'Camera scanner, WiFi connection generator, thermal asset stickers & decoder', category: 'Tools', tab: 'qr' },
     { id: 'tab_cheatsheets', title: 'Printable Cheat Sheets & Visual Reference Cards', subtitle: 'BIOS keys, EZ Debug LEDs, JFP1 front panel pinout, HDMI/DP specs & rescue commands', category: 'Cheat Sheets', tab: 'cheatsheets' },
     { id: 'tab_techsuite', title: 'Technician Multi-Tool & Subnet Calculator', subtitle: 'CIDR IPv4 subnetting, BIOS audio beepers & DNS ping latency', category: 'Tech Multi-Tool', tab: 'techsuite' },
-    { id: 'tab_admin', title: 'Admin Command Center & User Management', subtitle: 'Review pending registrations with client IP, approve roles & audit logs', category: 'Admin Suite', tab: 'admin' },
+    { id: 'tab_admin', title: 'Admin Command Center & User Management', subtitle: 'Review pending registrations with client IP, approve roles & audit logs', category: 'Admin Suite', tab: 'admin', adminOnly: true },
     { id: 'tab_errors', title: 'Windows Error Code & BSOD Matrix', subtitle: 'Lookup hex errors (0x80070002, 0x800F081F)', category: 'Navigation', tab: 'errors' },
     { id: 'tab_psu', title: 'Power Supply & Voltage Rail Calculator', subtitle: 'Estimate +12V/+5V/+3.3V loads & DMM limits', category: 'Navigation', tab: 'psu' },
     { id: 'tab_scripts', title: 'Technician Batch & PowerShell Script Generator', subtitle: 'Compile automated .bat/.ps1 repair scripts', category: 'Navigation', tab: 'scripts' },
@@ -135,8 +137,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     }))
   ];
 
+  const accessibleItems = allItems.filter(item => !item.adminOnly || isAdmin);
+
   const q = query.toLowerCase().trim();
-  const filtered = items.filter(i =>
+  const filtered = accessibleItems.filter(i =>
     !q ||
     i.title.toLowerCase().includes(q) ||
     i.subtitle.toLowerCase().includes(q) ||

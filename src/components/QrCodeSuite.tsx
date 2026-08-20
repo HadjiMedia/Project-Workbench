@@ -256,12 +256,28 @@ export const QrCodeSuite: React.FC<QrCodeSuiteProps> = ({ tickets = [], onOpenTi
     generateQr();
   }, [generateQr]);
 
+  // Safe DataURL to Blob conversion without calling fetch
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    try {
+      const parts = dataUrl.split(',');
+      const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+      const binaryStr = atob(parts[1]);
+      const len = binaryStr.length;
+      const u8arr = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        u8arr[i] = binaryStr.charCodeAt(i);
+      }
+      return new Blob([u8arr], { type: mime });
+    } catch {
+      return new Blob([], { type: 'image/png' });
+    }
+  };
+
   // Copy Image or Raw to Clipboard
   const handleCopyImage = async () => {
     if (!generatedDataUrl) return;
     try {
-      const res = await fetch(generatedDataUrl);
-      const blob = await res.blob();
+      const blob = dataUrlToBlob(generatedDataUrl);
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': blob })
       ]);
@@ -269,9 +285,13 @@ export const QrCodeSuite: React.FC<QrCodeSuiteProps> = ({ tickets = [], onOpenTi
       setTimeout(() => setIsCopied(false), 2000);
     } catch {
       // Fallback copy raw text
-      navigator.clipboard.writeText(getRawQrString());
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
+      try {
+        await navigator.clipboard.writeText(getRawQrString());
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch {
+        // clipboard unavailable
+      }
     }
   };
 

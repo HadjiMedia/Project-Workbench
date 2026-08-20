@@ -2,6 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Compatibility shim for environments where window.fetch has only a getter
+      (function() {
+        try {
+          var _nativeFetch = window.fetch ? window.fetch.bind(window) : undefined;
+          var _customFetch = _nativeFetch;
+          Object.defineProperty(window, 'fetch', {
+            get: function() {
+              return _customFetch || _nativeFetch;
+            },
+            set: function(val) {
+              _customFetch = typeof val === 'function' ? val.bind(window) : val;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {
+          // Fallback if defineProperty fails
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Workbench — Technical Diagnostics &amp; Software Repair Console</title>
     <meta name="description" content="Professional hardware & software diagnostics console, Windows error matrix, PSU rail calculator, batch script generator, ticketing & work order system, interactive pinouts, and Web Serial POST analyzer." />
@@ -17,9 +38,11 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var r of registrations) {
+            r.unregister();
+          }
+        }).catch(function() {});
       }
     </script>
   </body>
