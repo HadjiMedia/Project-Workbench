@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { TabId, JobTicket, User, SecurityAuditLog } from './types';
 import { INITIAL_USERS, INITIAL_AUDIT_LOGS } from './data/usersData';
+import { INITIAL_TICKETS } from './data/sampleTickets';
 import { Navigation } from './components/Navigation';
+import { OverviewDashboard } from './components/OverviewDashboard';
 import { ErrorMatrix } from './components/ErrorMatrix';
 import { PsuCalculator } from './components/PsuCalculator';
 import { ScriptGenerator } from './components/ScriptGenerator';
@@ -25,9 +27,9 @@ export function App() {
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     try {
       const saved = localStorage.getItem('wb_active_tab');
-      return (saved as TabId) || 'errors';
+      return (saved as TabId) || 'overview';
     } catch {
-      return 'errors';
+      return 'overview';
     }
   });
 
@@ -59,7 +61,17 @@ export function App() {
     }
   });
 
-  // Persist Users & Logs
+  // Centralized Repair Job Tickets
+  const [tickets, setTickets] = useState<JobTicket[]>(() => {
+    try {
+      const saved = localStorage.getItem('wb_repair_tickets');
+      return saved ? JSON.parse(saved) : INITIAL_TICKETS;
+    } catch {
+      return INITIAL_TICKETS;
+    }
+  });
+
+  // Persist Users, Logs & Tickets
   useEffect(() => {
     localStorage.setItem('wb_users', JSON.stringify(users));
   }, [users]);
@@ -67,6 +79,10 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('wb_audit_logs', JSON.stringify(auditLogs));
   }, [auditLogs]);
+
+  useEffect(() => {
+    localStorage.setItem('wb_repair_tickets', JSON.stringify(tickets));
+  }, [tickets]);
 
   useEffect(() => {
     if (currentUser) {
@@ -214,12 +230,29 @@ export function App() {
 
         {/* Tab Viewport Routing */}
         <main className="transition-all duration-150">
+          {activeTab === 'overview' && (
+            <OverviewDashboard
+              currentUser={currentUser}
+              users={users}
+              tickets={tickets}
+              auditLogs={auditLogs}
+              onNavigateTab={handleTabChange}
+              onOpenInvoice={handleOpenTicketInvoice}
+              isOnline={isOnline}
+            />
+          )}
           {activeTab === 'errors' && <ErrorMatrix />}
           {activeTab === 'cheatsheets' && <CheatSheetHub />}
           {activeTab === 'psu' && <PsuCalculator />}
           {activeTab === 'scripts' && <ScriptGenerator />}
           {activeTab === 'techsuite' && <TechSuite />}
-          {activeTab === 'tickets' && <TicketingSystem onOpenInvoice={handleOpenTicketInvoice} />}
+          {activeTab === 'tickets' && (
+            <TicketingSystem 
+              onOpenInvoice={handleOpenTicketInvoice} 
+              tickets={tickets}
+              onUpdateTickets={setTickets}
+            />
+          )}
           {activeTab === 'invoice' && (
             <InvoiceGenerator
               initialTicket={activeInvoiceTicket}

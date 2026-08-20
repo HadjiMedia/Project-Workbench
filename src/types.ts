@@ -1,4 +1,5 @@
 export type TabId = 
+  | 'overview'
   | 'errors'
   | 'psu'
   | 'scripts'

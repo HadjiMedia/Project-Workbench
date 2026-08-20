@@ -135,10 +135,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ isVaultUnlocked, o
   };
 
   const handleDeleteArticle = (id: string) => {
-    if (confirm('Delete this repair tutorial?')) {
-      setArticles(prev => prev.filter(a => a.id !== id));
-      if (activeArticle?.id === id) setActiveArticle(null);
-    }
+    setArticles(prev => prev.filter(a => a.id !== id));
+    if (activeArticle?.id === id) setActiveArticle(null);
   };
 
   return (

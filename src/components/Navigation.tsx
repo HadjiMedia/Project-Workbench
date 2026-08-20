@@ -1,7 +1,7 @@
 import React from 'react';
 import { TabId, User } from '../types';
 import { 
-  Terminal, Zap, FileCode2, ClipboardList, FileText, 
+  LayoutDashboard, Terminal, Zap, FileCode2, ClipboardList, FileText, 
   CircuitBoard, Cable, LayoutGrid, BookOpen, Keyboard, 
   Lock, Unlock, Database, Search, Wifi, WifiOff, ShieldCheck, 
   User as UserIcon, LogIn, LogOut, Wrench, ShieldAlert, Bookmark, Printer
@@ -35,6 +35,9 @@ export const Navigation: React.FC<NavigationProps> = ({
   isOnline
 }) => {
   const tabs: { id: TabId; label: string; icon: any; adminOnly?: boolean }[] = [
+    // Overview Dashboard
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+
     // Phase 1 Tabs
     { id: 'errors', label: 'Windows Error Matrix', icon: Terminal },
     { id: 'cheatsheets', label: 'Printable Cheat Sheets', icon: Bookmark },

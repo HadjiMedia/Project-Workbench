@@ -134,13 +134,11 @@ export const VaultModal: React.FC<VaultModalProps> = ({
 
   // Reset PIN
   const handleResetPin = () => {
-    if (confirm('Are you sure you want to reset the Vault PIN? All restricted guides will remain locked until a new PIN is created.')) {
-      localStorage.removeItem('wb_vault_pin_hash');
-      setSavedPinHash(null);
-      onLock();
-      setView('setup');
-      setSuccessMsg('Vault PIN reset. Please create a new PIN.');
-    }
+    localStorage.removeItem('wb_vault_pin_hash');
+    setSavedPinHash(null);
+    onLock();
+    setView('setup');
+    setSuccessMsg('Vault PIN reset. Please create a new PIN.');
   };
 
   return (

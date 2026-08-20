@@ -93,26 +93,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }, 400);
   };
 
-  // Quick 1-Click Demo Login
-  const handleQuickDemoLogin = (email: string, pass: string) => {
-    setErrorMsg('');
-    const targetUser = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === pass);
-    if (targetUser) {
-      const updatedUser: User = {
-        ...targetUser,
-        lastLoginAt: new Date().toISOString(),
-        lastLoginIp: detectedIp
-      };
-      setSuccessMsg(`Launching session as ${targetUser.fullName} (${targetUser.role.toUpperCase()})...`);
-      setTimeout(() => {
-        onLoginSuccess(updatedUser);
-      }, 300);
-    } else {
-      setLoginIdentifier(email);
-      setLoginPassword(pass);
-    }
-  };
-
   // Handle Register Submission
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,40 +284,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 >
                   <ShieldCheck className="w-4 h-4" /> Authenticate &amp; Launch Console
                 </button>
-
-                {/* 1-Click Demo Quick Fast Logins */}
-                <div className="pt-3 border-t border-white/10 space-y-2">
-                  <div className="flex items-center justify-between text-[10px] font-mono uppercase text-slate-500">
-                    <span>1-CLICK INSTANT DEMO ROLES:</span>
-                    <span className="text-amber-400 font-bold">Fast Access</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickDemoLogin('admin@workbench.local', 'admin123')}
-                      className="p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-left transition-all group"
-                    >
-                      <div className="font-bold flex items-center justify-between">
-                        <span className="flex items-center gap-1">👑 Admin</span>
-                        <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 truncate">Full Permissions</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleQuickDemoLogin('sarah.tech@workbench.local', 'tech123')}
-                      className="p-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-left transition-all group"
-                    >
-                      <div className="font-bold flex items-center justify-between">
-                        <span>⚡ Bench Tech</span>
-                        <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 truncate">Hardware &amp; OS</div>
-                    </button>
-                  </div>
-                </div>
               </form>
             )}
 
@@ -457,13 +403,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('admin@workbench.local', 'admin123')}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center gap-1.5 shadow-md shadow-amber-400/20 transition-all shrink-0 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Launch Demo as Admin
-              </button>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#181d29] border border-white/10 text-xs font-mono text-amber-300 shrink-0">
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Sign in for Full Console</span>
+              </div>
             </div>
 
             {/* Feature Selector Tabs */}

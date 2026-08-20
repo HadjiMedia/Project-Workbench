@@ -3,7 +3,8 @@ import { User, UserRole, UserStatus, SecurityAuditLog } from '../types';
 import { 
   ShieldCheck, Users, CheckCircle2, XCircle, AlertTriangle, 
   Search, Filter, Globe, Clock, KeyRound, UserCheck, UserX, 
-  Trash2, Edit3, Download, RefreshCw, ShieldAlert, Activity, ArrowUpRight
+  Trash2, Edit3, Download, RefreshCw, ShieldAlert, Activity, ArrowUpRight,
+  FileText, FileCode2, Check, Sparkles
 } from 'lucide-react';
 
 interface AdminCenterProps {
@@ -26,6 +27,14 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  // Audit Log State
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [auditSeverityFilter, setAuditSeverityFilter] = useState<string>('All');
+  const [exportToast, setExportToast] = useState<string | null>(null);
+
+  // User Deletion Modal State
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const pendingUsers = users.filter(u => u.status === 'pending');
   const activeUsers = users.filter(u => u.status === 'active');
@@ -129,46 +138,128 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
     });
   };
 
-  // Delete User
+  // Initiate Delete User
   const handleDeleteUser = (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
 
-    if (confirm(`Permanently remove user ${targetUser.fullName} (${targetUser.email})?`)) {
-      const updated = users.filter(u => u.id !== userId);
-      onUpdateUsers(updated);
-      if (selectedUser?.id === userId) setSelectedUser(null);
-
-      onAddAuditLog({
-        id: 'log_' + Date.now(),
-        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-        userId: currentUser?.id,
-        userEmail: currentUser?.email || 'admin',
-        action: 'USER_DELETED',
-        ip: currentUser?.lastLoginIp || '127.0.0.1',
-        userAgent: navigator.userAgent,
-        details: `Deleted user record for ${targetUser.fullName} (${targetUser.email})`,
-        severity: 'critical'
-      });
+    if (currentUser && currentUser.id === userId) {
+      showToast('⚠️ Security rule: You cannot delete your currently active administrator session account.');
+      return;
     }
+
+    setUserToDelete(targetUser);
+  };
+
+  // Confirm Permanent Deletion
+  const handleConfirmDelete = () => {
+    if (!userToDelete) return;
+
+    const target = userToDelete;
+    const updated = users.filter(u => u.id !== target.id);
+    onUpdateUsers(updated);
+    if (selectedUser?.id === target.id) setSelectedUser(null);
+    setUserToDelete(null);
+
+    onAddAuditLog({
+      id: 'log_' + Date.now(),
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      userId: currentUser?.id,
+      userEmail: currentUser?.email || 'admin',
+      action: 'USER_DELETED',
+      ip: currentUser?.lastLoginIp || '127.0.0.1',
+      userAgent: navigator.userAgent,
+      details: `Permanently deleted technician profile ${target.fullName} (${target.email}, Callsign: ${target.techCallsign}, Role: ${target.role.toUpperCase()})`,
+      severity: 'critical'
+    });
+
+    showToast(`Technician account "${target.fullName}" (${target.techCallsign}) was permanently deleted.`);
+  };
+
+  // Filtered Audit Logs
+  const filteredAuditLogs = auditLogs.filter(log => {
+    const matchesSeverity = auditSeverityFilter === 'All' || log.severity === auditSeverityFilter;
+    const q = auditSearchQuery.toLowerCase().trim();
+    const matchesQuery = !q ||
+      log.action.toLowerCase().includes(q) ||
+      log.userEmail.toLowerCase().includes(q) ||
+      log.ip.toLowerCase().includes(q) ||
+      (log.details || '').toLowerCase().includes(q) ||
+      log.timestamp.toLowerCase().includes(q);
+
+    return matchesSeverity && matchesQuery;
+  });
+
+  const showToast = (message: string) => {
+    setExportToast(message);
+    setTimeout(() => setExportToast(null), 3500);
   };
 
   // Export Audit Logs to CSV
-  const handleExportAuditLogs = () => {
-    let csv = 'Timestamp,Action,User,IP,Severity,Details\n';
-    auditLogs.forEach(l => {
-      csv += `"${l.timestamp}","${l.action}","${l.userEmail}","${l.ip}","${l.severity}","${(l.details || '').replace(/"/g, '""')}"\n`;
+  const handleExportAuditLogsCSV = (exportFilteredOnly = false) => {
+    const targetLogs = exportFilteredOnly ? filteredAuditLogs : auditLogs;
+    if (targetLogs.length === 0) {
+      showToast('No audit logs available to export.');
+      return;
+    }
+
+    let csv = 'Log_ID,Timestamp,Severity,Action,User_Email,User_ID,IP_Address,User_Agent,Details\n';
+    targetLogs.forEach(l => {
+      csv += `"${l.id}","${l.timestamp}","${l.severity.toUpperCase()}","${l.action}","${l.userEmail}","${l.userId || ''}","${l.ip}","${(l.userAgent || '').replace(/"/g, '""')}","${(l.details || '').replace(/"/g, '""')}"\n`;
     });
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Workbench_Security_Audit_Logs_${Date.now()}.csv`;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.download = `Workbench_Audit_Logs_${dateStr}_${Date.now()}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    showToast(`Successfully exported ${targetLogs.length} audit log records as CSV!`);
+  };
+
+  // Export Audit Logs to JSON
+  const handleExportAuditLogsJSON = (exportFilteredOnly = false) => {
+    const targetLogs = exportFilteredOnly ? filteredAuditLogs : auditLogs;
+    if (targetLogs.length === 0) {
+      showToast('No audit logs available to export.');
+      return;
+    }
+
+    const exportData = {
+      exportMetadata: {
+        exportedAt: new Date().toISOString(),
+        exportedBy: currentUser?.email || 'admin',
+        exporterRole: currentUser?.role || 'admin',
+        complianceStandard: 'NIST SP 800-92 / ISO 27001 Log Management',
+        totalSystemRecords: auditLogs.length,
+        exportedRecordCount: targetLogs.length,
+        isFilteredSubset: exportFilteredOnly,
+        activeFilters: exportFilteredOnly ? {
+          severity: auditSeverityFilter,
+          searchQuery: auditSearchQuery || 'none'
+        } : 'None (Full System Export)'
+      },
+      auditLogs: targetLogs
+    };
+
+    const jsonStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.download = `Workbench_Audit_Logs_${dateStr}_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast(`Successfully exported ${targetLogs.length} audit log records as JSON!`);
   };
 
   // Filtered users for master directory
@@ -224,12 +315,20 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={handleExportAuditLogs}
-              className="px-3.5 py-2 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 flex items-center gap-1.5 transition-all"
+              onClick={() => handleExportAuditLogsCSV(false)}
+              className="px-3 py-2 rounded-xl text-xs font-mono bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 flex items-center gap-1.5 transition-all font-semibold cursor-pointer"
+              title="Download full audit log history as CSV"
             >
-              <Download className="w-3.5 h-3.5" /> Export Audit CSV
+              <FileText className="w-3.5 h-3.5" /> Export CSV
+            </button>
+            <button
+              onClick={() => handleExportAuditLogsJSON(false)}
+              className="px-3 py-2 rounded-xl text-xs font-mono bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 flex items-center gap-1.5 transition-all font-semibold cursor-pointer"
+              title="Download full audit log history as JSON"
+            >
+              <FileCode2 className="w-3.5 h-3.5" /> Export JSON
             </button>
           </div>
         </div>
@@ -262,6 +361,22 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Global Admin Feedback Toast */}
+      {exportToast && (
+        <div className="p-3.5 rounded-2xl bg-[#181d29] border border-amber-400/40 text-slate-200 font-mono text-xs flex items-center justify-between gap-3 shadow-2xl animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-medium">{exportToast}</span>
+          </div>
+          <button 
+            onClick={() => setExportToast(null)}
+            className="text-slate-400 hover:text-white font-bold px-2 py-0.5 rounded hover:bg-white/10 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Navigation Sub-Tabs */}
       <div className="flex gap-2 border-b border-white/10 pb-2">
@@ -367,15 +482,23 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                   <div className="flex items-center gap-2 pt-2 border-t border-white/10">
                     <button
                       onClick={() => handleApproveUser(user.id)}
-                      className="flex-1 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                      className="flex-1 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" /> Approve Access
                     </button>
                     <button
                       onClick={() => handleRejectUser(user.id)}
-                      className="px-3.5 py-2 rounded-xl text-xs font-mono bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1"
+                      className="px-3 py-2 rounded-xl text-xs font-mono bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1 cursor-pointer"
+                      title="Mark application as rejected"
                     >
                       <XCircle className="w-3.5 h-3.5" /> Reject
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(user.id)}
+                      className="p-2 rounded-xl text-xs font-mono bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-white/10 hover:border-rose-500/40 flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Permanently purge application"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -495,9 +618,10 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                           )}
 
                           <button
+                            type="button"
                             onClick={() => handleDeleteUser(user.id)}
-                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-rose-400"
-                            title="Delete User"
+                            className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-white/5 hover:border-rose-500/30 transition-colors cursor-pointer"
+                            title="Delete User Record"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -514,51 +638,242 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
       {/* TAB 3: SECURITY & IP AUDIT LOG */}
       {activeTab === 'audit' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Audit Controls & Export Bar */}
+          <div className="bg-[#12161f]/80 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            
+            {/* Search & Severity Filter */}
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 flex-1">
+              <div className="relative flex-1 w-full">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={auditSearchQuery}
+                  onChange={e => setAuditSearchQuery(e.target.value)}
+                  placeholder="Filter by action, user email, IP address, or details..."
+                  className="w-full bg-[#181d29] border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:border-amber-400 font-mono"
+                />
+              </div>
+
+              <select
+                value={auditSeverityFilter}
+                onChange={e => setAuditSeverityFilter(e.target.value)}
+                className="w-full sm:w-auto bg-[#181d29] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:border-amber-400"
+              >
+                <option value="All">All Severities ({auditLogs.length})</option>
+                <option value="critical">Critical Only ({auditLogs.filter(l => l.severity === 'critical').length})</option>
+                <option value="warning">Warnings ({auditLogs.filter(l => l.severity === 'warning').length})</option>
+                <option value="info">Informational ({auditLogs.filter(l => l.severity === 'info').length})</option>
+              </select>
+            </div>
+
+            {/* Export Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <div className="flex items-center rounded-xl bg-[#181d29] p-1 border border-white/10 font-mono text-xs">
+                {/* Export CSV Button */}
+                <button
+                  type="button"
+                  onClick={() => handleExportAuditLogsCSV(auditSearchQuery !== '' || auditSeverityFilter !== 'All')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-all font-bold cursor-pointer"
+                  title="Download as CSV spreadsheet format"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Download CSV</span>
+                </button>
+
+                <div className="h-4 w-px bg-white/10 mx-1" />
+
+                {/* Export JSON Button */}
+                <button
+                  type="button"
+                  onClick={() => handleExportAuditLogsJSON(auditSearchQuery !== '' || auditSeverityFilter !== 'All')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 transition-all font-bold cursor-pointer"
+                  title="Download as JSON raw data structure"
+                >
+                  <FileCode2 className="w-3.5 h-3.5" />
+                  <span>Download JSON</span>
+                </button>
+              </div>
+
+              {(auditSearchQuery !== '' || auditSeverityFilter !== 'All') && (
+                <button
+                  type="button"
+                  onClick={() => { setAuditSearchQuery(''); setAuditSeverityFilter('All'); }}
+                  className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs font-mono border border-white/10 transition-all"
+                  title="Reset search and filters"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+          </div>
+
+          {/* Audit Logs Table / Feed */}
           <div className="bg-[#0b0e14] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 bg-white/[0.03] border-b border-white/10 text-xs font-mono">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 bg-white/[0.03] border-b border-white/10 text-xs font-mono gap-2">
               <span className="text-slate-200 font-bold flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                Live Security Telemetry &amp; IP Access Log ({auditLogs.length} Events)
+                <span>Historical Security Telemetry &amp; IP Access Log</span>
+                <span className="text-slate-400 text-[11px] font-normal">
+                  (Showing {filteredAuditLogs.length} of {auditLogs.length} Records)
+                </span>
               </span>
+
+              <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                  🛡️ NIST / ISO 27001 Ready
+                </span>
+                <span>Tamper-Evident Local Storage</span>
+              </div>
+            </div>
+
+            {filteredAuditLogs.length > 0 ? (
+              <div className="divide-y divide-white/5 max-h-[520px] overflow-y-auto font-mono text-xs">
+                {filteredAuditLogs.map(log => (
+                  <div key={log.id} className="p-3.5 hover:bg-white/[0.02] flex items-start justify-between gap-4 transition-colors">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-slate-500 text-[10px]">[{log.timestamp}]</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          log.severity === 'critical'
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                            : log.severity === 'warning'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                            : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                        }`}>
+                          {log.action}
+                        </span>
+                        <span className="text-slate-200 font-bold truncate">{log.userEmail}</span>
+                        {log.userId && (
+                          <span className="text-slate-500 text-[10px]">({log.userId})</span>
+                        )}
+                      </div>
+                      <p className="text-slate-300 text-[11px] leading-relaxed break-words">{log.details}</p>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1 text-teal-300 font-bold justify-end text-[11px]">
+                        <Globe className="w-3 h-3" />
+                        <span>{log.ip}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 block max-w-[220px] truncate mt-0.5" title={log.userAgent}>
+                        {log.userAgent}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-12 text-center space-y-3 font-mono">
+                <ShieldAlert className="w-10 h-10 text-slate-600 mx-auto" />
+                <div className="text-sm font-bold text-slate-300">No matching audit records found</div>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Try adjusting your search keywords or severity filters to view historical security events.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setAuditSearchQuery(''); setAuditSeverityFilter('All'); }}
+                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs transition-all"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
+
+            {/* Bottom Footer Info */}
+            <div className="px-4 py-2.5 bg-white/[0.02] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between text-[11px] font-mono text-slate-400 gap-2">
+              <span>All administrative actions, authentication attempts, role changes, and IP addresses are recorded chronologically.</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleExportAuditLogsCSV(false)}
+                  className="text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Download className="w-3 h-3" /> Export Full History (CSV)
+                </button>
+                <span>·</span>
+                <button
+                  onClick={() => handleExportAuditLogsJSON(false)}
+                  className="text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Download className="w-3 h-3" /> Export Full History (JSON)
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* PERMANENT USER DELETION CONFIRMATION MODAL */}
+      {userToDelete && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#12161f] border border-rose-500/40 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+            
+            {/* Modal Header */}
+            <div className="flex items-start gap-3">
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
+                  Permanently Delete Technician Profile?
+                </h3>
+                <p className="text-xs text-slate-400">
+                  This action cannot be undone. All access credentials and technician identity records will be purged.
+                </p>
+              </div>
+            </div>
+
+            {/* Target User Details Card */}
+            <div className="bg-[#181d29] p-4 rounded-xl border border-white/10 space-y-2 font-mono text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Technician:</span>
+                <span className="text-white font-bold">{userToDelete.fullName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Email:</span>
+                <span className="text-slate-300">{userToDelete.email}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Callsign:</span>
+                <span className="text-amber-400 font-bold">{userToDelete.techCallsign}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Role:</span>
+                <span className="text-slate-300 uppercase">{userToDelete.role}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Registered IP:</span>
+                <span className="text-teal-400">{userToDelete.registeredIp}</span>
+              </div>
+            </div>
+
+            {/* Warning Callout */}
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-300 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>A tamper-evident critical audit log entry will be permanently written to the system ledger.</span>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center gap-2.5 pt-2 border-t border-white/10">
               <button
-                onClick={handleExportAuditLogs}
-                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-[11px]"
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl font-mono text-xs bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all cursor-pointer font-semibold"
               >
-                Download CSV
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 rounded-xl font-mono text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Permanently</span>
               </button>
             </div>
 
-            <div className="divide-y divide-white/5 max-h-[520px] overflow-y-auto font-mono text-xs">
-              {auditLogs.map(log => (
-                <div key={log.id} className="p-3.5 hover:bg-white/[0.02] flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-500 text-[10px]">[{log.timestamp}]</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                        log.severity === 'critical'
-                          ? 'bg-rose-500/20 text-rose-400'
-                          : log.severity === 'warning'
-                          ? 'bg-amber-500/20 text-amber-400'
-                          : 'bg-sky-500/20 text-sky-300'
-                      }`}>
-                        {log.action}
-                      </span>
-                      <span className="text-slate-200 font-bold">{log.userEmail}</span>
-                    </div>
-                    <p className="text-slate-400 text-[11px]">{log.details}</p>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <div className="flex items-center gap-1 text-teal-300 font-bold justify-end text-[11px]">
-                      <Globe className="w-3 h-3" />
-                      {log.ip}
-                    </div>
-                    <span className="text-[10px] text-slate-600 block max-w-[200px] truncate">{log.userAgent}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       )}

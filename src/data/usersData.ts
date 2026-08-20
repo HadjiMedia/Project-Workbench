@@ -8,7 +8,7 @@ export const INITIAL_USERS: User[] = [
     techCallsign: 'LEAD-OPS-01',
     role: 'admin',
     status: 'active',
-    passwordHash: 'admin123', // Demo plaintext/hash
+    passwordHash: 'admin123',
     registeredAt: '2026-01-10T08:00:00.000Z',
     registeredIp: '192.168.1.100 (Internal LAN)',
     lastLoginAt: new Date().toISOString(),

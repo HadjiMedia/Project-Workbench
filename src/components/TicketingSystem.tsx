@@ -8,10 +8,16 @@ import {
 
 interface TicketingSystemProps {
   onOpenInvoice: (ticket: JobTicket) => void;
+  tickets?: JobTicket[];
+  onUpdateTickets?: (tickets: JobTicket[]) => void;
 }
 
-export const TicketingSystem: React.FC<TicketingSystemProps> = ({ onOpenInvoice }) => {
-  const [tickets, setTickets] = useState<JobTicket[]>(() => {
+export const TicketingSystem: React.FC<TicketingSystemProps> = ({ 
+  onOpenInvoice,
+  tickets: parentTickets,
+  onUpdateTickets
+}) => {
+  const [internalTickets, setInternalTickets] = useState<JobTicket[]>(() => {
     try {
       const saved = localStorage.getItem('wb_repair_tickets');
       return saved ? JSON.parse(saved) : INITIAL_TICKETS;
@@ -19,6 +25,18 @@ export const TicketingSystem: React.FC<TicketingSystemProps> = ({ onOpenInvoice 
       return INITIAL_TICKETS;
     }
   });
+
+  const tickets = parentTickets || internalTickets;
+  const setTickets = (updater: JobTicket[] | ((prev: JobTicket[]) => JobTicket[])) => {
+    if (typeof updater === 'function') {
+      const next = updater(tickets);
+      if (onUpdateTickets) onUpdateTickets(next);
+      setInternalTickets(next);
+    } else {
+      if (onUpdateTickets) onUpdateTickets(updater);
+      setInternalTickets(updater);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -254,10 +272,8 @@ export const TicketingSystem: React.FC<TicketingSystemProps> = ({ onOpenInvoice 
 
   // Delete ticket
   const handleDeleteTicket = (id: string) => {
-    if (confirm('Delete this ticket record?')) {
-      setTickets(prev => prev.filter(t => t.id !== id));
-      if (activeTicketDetail?.id === id) setActiveTicketDetail(null);
-    }
+    setTickets(prev => prev.filter(t => t.id !== id));
+    if (activeTicketDetail?.id === id) setActiveTicketDetail(null);
   };
 
   // Filtered tickets

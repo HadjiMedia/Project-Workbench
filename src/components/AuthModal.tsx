@@ -93,12 +93,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setTimeout(() => onClose(), 800);
   };
 
-  // Quick Demo Account Auto-Fill
-  const fillDemoAccount = (email: string, pass: string) => {
-    setLoginIdentifier(email);
-    setLoginPassword(pass);
-  };
-
   // Handle Registration
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
@@ -244,32 +238,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             >
               <ShieldCheck className="w-4 h-4" /> Authenticate &amp; Access Suite
             </button>
-
-            {/* Quick Demo Pre-fills */}
-            <div className="pt-2 border-t border-white/5 space-y-2">
-              <span className="text-[10px] font-mono uppercase text-slate-500 block">Instant Demo Access:</span>
-              <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => fillDemoAccount('admin@workbench.local', 'admin123')}
-                  className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-left transition-all"
-                >
-                  <div className="font-bold flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-400" /> Admin Role
-                  </div>
-                  <div className="text-[10px] text-slate-400">admin@workbench.local</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => fillDemoAccount('sarah.tech@workbench.local', 'tech123')}
-                  className="p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-left transition-all"
-                >
-                  <div className="font-bold">Bench Tech Role</div>
-                  <div className="text-[10px] text-slate-400">sarah.tech@workbench.local</div>
-                </button>
-              </div>
-            </div>
           </form>
         )}
 
