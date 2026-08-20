@@ -5,7 +5,8 @@ import {
   Search, Filter, Globe, Clock, KeyRound, UserCheck, UserX, 
   Trash2, Edit3, Download, RefreshCw, ShieldAlert, Activity, ArrowUpRight,
   FileText, FileCode2, Check, Sparkles, CheckSquare, Square, MinusSquare,
-  Shield, UserMinus, ShieldQuestion, ChevronDown, CheckCheck
+  Shield, UserMinus, ShieldQuestion, ChevronDown, CheckCheck, Wrench,
+  Radio, Zap, Award, Send, Key, HardDrive
 } from 'lucide-react';
 
 interface AdminCenterProps {
@@ -19,20 +20,19 @@ interface AdminCenterProps {
 
 export const AdminCenter: React.FC<AdminCenterProps> = ({
   currentUser,
-  users,
-  auditLogs,
+  users = [],
+  auditLogs = [],
   onUpdateUsers,
   onDeleteUsers,
   onAddAuditLog
 }) => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'audit' | 'settings'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'audit'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   
   // Bulk selection state
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
-  const [bulkRoleTarget, setBulkRoleTarget] = useState<UserRole>('bench_tech');
   const [isBulkRoleDropdownOpen, setIsBulkRoleDropdownOpen] = useState(false);
 
   // Modals & Feedback
@@ -40,39 +40,33 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
 
-  // Security Verification Guard
-  if (!currentUser || currentUser.role !== 'admin') {
-    return (
-      <div className="p-8 rounded-2xl bg-[#0e121a] border border-rose-500/30 text-center space-y-4 max-w-2xl mx-auto my-8">
-        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 mx-auto flex items-center justify-center">
-          <ShieldAlert className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-white font-['Space_Grotesk']">Access Restricted: Administrator Privileges Required</h2>
-        <p className="text-xs text-slate-400 font-mono">
-          Your current account ({currentUser?.fullName || 'Guest'} · {currentUser?.techCallsign || 'TECH-00'}) has role <span className="text-amber-400 font-bold uppercase">{currentUser?.role || 'BENCH_TECH'}</span>. Only authorized administrators can access user approval and security audit logs.
-        </p>
-      </div>
-    );
-  }
+  // Dedicated Admin Approval Action Modal
+  const [approvalTargetUser, setApprovalTargetUser] = useState<User | null>(null);
+  const [approvalRole, setApprovalRole] = useState<UserRole>('bench_tech');
+  const [approvalCallsign, setApprovalCallsign] = useState('');
+  const [approvalStation, setApprovalStation] = useState('Bench Station #1 (Diagnostics)');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvalBadgeAnimation, setApprovalBadgeAnimation] = useState<string | null>(null);
 
   // Audit Log State
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [auditSeverityFilter, setAuditSeverityFilter] = useState<string>('All');
 
-  const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
-  const activeUsers = useMemo(() => users.filter(u => u.status === 'active'), [users]);
-  const suspendedUsers = useMemo(() => users.filter(u => u.status === 'suspended'), [users]);
+  const pendingUsers = useMemo(() => (users || []).filter(u => u && u.status === 'pending'), [users]);
+  const activeUsers = useMemo(() => (users || []).filter(u => u && u.status === 'active'), [users]);
+  const suspendedUsers = useMemo(() => (users || []).filter(u => u && u.status === 'suspended'), [users]);
 
   // Filtered users for master directory
   const filteredUsers = useMemo(() => {
-    return users.filter(u => {
+    return (users || []).filter(u => {
+      if (!u) return false;
       const matchesRole = roleFilter === 'All' || u.role === roleFilter;
       const matchesStatus = statusFilter === 'All' || u.status === statusFilter;
       const q = searchQuery.toLowerCase().trim();
       const matchesQuery = !q ||
-        u.fullName.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        u.techCallsign.toLowerCase().includes(q) ||
+        (u.fullName && u.fullName.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.techCallsign && u.techCallsign.toLowerCase().includes(q)) ||
         (u.registeredIp && u.registeredIp.toLowerCase().includes(q)) ||
         (u.lastLoginIp && u.lastLoginIp.toLowerCase().includes(q));
 
@@ -89,7 +83,22 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
   }, [activeTab, pendingUsers, filteredUsers]);
 
   const isAllVisibleSelected = currentVisibleUserIds.length > 0 && currentVisibleUserIds.every(id => selectedUserIds.has(id));
-  const isSomeVisibleSelected = currentVisibleUserIds.some(id => selectedUserIds.has(id)) && !isAllVisibleSelected;
+  const isSomeVisibleSelected = currentVisibleUserIds.length > 0 && currentVisibleUserIds.some(id => selectedUserIds.has(id)) && !isAllVisibleSelected;
+
+  // Security Verification Guard
+  if (!currentUser || currentUser.role !== 'admin') {
+    return (
+      <div className="p-8 rounded-2xl bg-[#0e121a] border border-rose-500/30 text-center space-y-4 max-w-2xl mx-auto my-8 animate-in fade-in zoom-in-95">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 mx-auto flex items-center justify-center">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-white font-['Space_Grotesk']">Access Restricted: Administrator Privileges Required</h2>
+        <p className="text-xs text-slate-400 font-mono">
+          Your current account ({currentUser?.fullName || 'Guest'} · {currentUser?.techCallsign || 'TECH-00'}) has role <span className="text-amber-400 font-bold uppercase">{currentUser?.role || 'BENCH_TECH'}</span>. Only authorized administrators can access user approval and security audit logs.
+        </p>
+      </div>
+    );
+  }
 
   const handleToggleSelectUser = (userId: string) => {
     setSelectedUserIds(prev => {
@@ -128,19 +137,79 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
     setTimeout(() => setExportToast(null), 4000);
   };
 
-  // --- Single User Actions ---
-  const handleApproveUser = (userId: string, assignedRole?: UserRole) => {
+  // Open Approval Actions Modal
+  const openApprovalModal = (user: User) => {
+    setApprovalTargetUser(user);
+    setApprovalRole(user.role || 'bench_tech');
+    setApprovalCallsign(user.techCallsign || `TECH-${Math.floor(10 + Math.random() * 89)}`);
+    setApprovalStation('Bench Station #1 (Diagnostics)');
+    setApprovalNotes('Account identity and bench clearances approved.');
+  };
+
+  // Execute Custom Admin Approval
+  const handleExecuteApproval = () => {
+    if (!approvalTargetUser) return;
+    const targetUser = approvalTargetUser;
+    const nowStr = new Date().toISOString();
+    const approvedByName = currentUser?.fullName || 'Lab Administrator';
+
+    const updated = users.map(u => {
+      if (u.id === targetUser.id) {
+        return {
+          ...u,
+          status: 'active' as UserStatus,
+          role: approvalRole,
+          techCallsign: approvalCallsign.trim() || targetUser.techCallsign,
+          approvedBy: approvedByName,
+          approvedAt: nowStr,
+          notes: `${u.notes || ''} | Station: ${approvalStation}. ${approvalNotes}`.trim()
+        };
+      }
+      return u;
+    });
+
+    onUpdateUsers(updated);
+
+    // Trigger celebration stamp animation
+    setApprovalBadgeAnimation(targetUser.id);
+    setTimeout(() => setApprovalBadgeAnimation(null), 3000);
+
+    onAddAuditLog({
+      id: 'log_' + Date.now(),
+      timestamp: nowStr.replace('T', ' ').slice(0, 19),
+      userId: currentUser?.id,
+      userEmail: currentUser?.email || 'admin',
+      action: 'USER_APPROVED_ACTION',
+      ip: currentUser?.lastLoginIp || '127.0.0.1',
+      userAgent: navigator.userAgent,
+      details: `Admin approved technician ${targetUser.fullName} as ${approvalRole.toUpperCase()} (Callsign: ${approvalCallsign}, Station: ${approvalStation}). Notes: ${approvalNotes}`,
+      severity: 'info'
+    });
+
+    setSelectedUserIds(prev => {
+      const next = new Set(prev);
+      next.delete(targetUser.id);
+      return next;
+    });
+
+    setApprovalTargetUser(null);
+    showToast(`🎉 Technician "${targetUser.fullName}" successfully commissioned as ${approvalRole.toUpperCase()}!`);
+  };
+
+  // --- Quick One-Click Approval Actions ---
+  const handleQuickApprove = (userId: string, roleToAssign: UserRole = 'bench_tech') => {
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
 
+    const nowStr = new Date().toISOString();
     const updated = users.map(u => {
       if (u.id === userId) {
         return {
           ...u,
           status: 'active' as UserStatus,
-          role: assignedRole || u.role,
+          role: roleToAssign,
           approvedBy: currentUser?.fullName || 'Lab Administrator',
-          approvedAt: new Date().toISOString()
+          approvedAt: nowStr
         };
       }
       return u;
@@ -153,19 +222,22 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
       return next;
     });
 
+    setApprovalBadgeAnimation(userId);
+    setTimeout(() => setApprovalBadgeAnimation(null), 3000);
+
     onAddAuditLog({
       id: 'log_' + Date.now(),
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      timestamp: nowStr.replace('T', ' ').slice(0, 19),
       userId: currentUser?.id,
       userEmail: currentUser?.email || 'admin',
-      action: 'USER_APPROVED',
+      action: 'USER_QUICK_APPROVED',
       ip: currentUser?.lastLoginIp || '127.0.0.1',
       userAgent: navigator.userAgent,
-      details: `Approved technician ${targetUser.fullName} (${targetUser.email}) with role ${(assignedRole || targetUser.role).toUpperCase()}. IP: ${targetUser.registeredIp || 'N/A'}`,
+      details: `Quick approved ${targetUser.fullName} with role ${roleToAssign.toUpperCase()}. Callsign: ${targetUser.techCallsign}`,
       severity: 'info'
     });
 
-    showToast(`Technician "${targetUser.fullName}" was approved successfully.`);
+    showToast(`⚡ Quick Approved "${targetUser.fullName}" as ${roleToAssign.toUpperCase()}.`);
   };
 
   const handleRejectUser = (userId: string) => {
@@ -300,7 +372,7 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
   }, [selectedUsersList]);
 
   // Bulk Approve
-  const handleBulkApprove = (assignedRole?: UserRole) => {
+  const handleBulkApprove = (assignedRole: UserRole = 'bench_tech') => {
     const targets = selectedUsersList.filter(u => u.status === 'pending' || u.status === 'rejected');
     if (targets.length === 0) {
       showToast('No pending or rejected accounts found in your selection.');
@@ -316,7 +388,7 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
         return {
           ...u,
           status: 'active' as UserStatus,
-          role: assignedRole || u.role,
+          role: assignedRole,
           approvedBy: approvedByName,
           approvedAt: nowStr
         };
@@ -326,7 +398,6 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
     onUpdateUsers(updated);
 
-    // Write batch audit log
     onAddAuditLog({
       id: 'log_' + Date.now(),
       timestamp: nowStr.replace('T', ' ').slice(0, 19),
@@ -335,12 +406,12 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
       action: 'BULK_USERS_APPROVED',
       ip: currentUser?.lastLoginIp || '127.0.0.1',
       userAgent: navigator.userAgent,
-      details: `Bulk approved ${targets.length} technician accounts: ${targets.map(t => `${t.fullName} (${t.techCallsign})`).join(', ')}`,
+      details: `Bulk approved ${targets.length} technician accounts as ${assignedRole.toUpperCase()}: ${targets.map(t => `${t.fullName} (${t.techCallsign})`).join(', ')}`,
       severity: 'info'
     });
 
     setSelectedUserIds(new Set());
-    showToast(`🎉 Successfully bulk approved ${targets.length} technician accounts!`);
+    showToast(`🎉 Successfully bulk approved ${targets.length} accounts as ${assignedRole.toUpperCase()}!`);
   };
 
   // Bulk Reject
@@ -398,7 +469,6 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
   // Bulk Suspend / Activate
   const handleBulkSetStatus = (newStatus: UserStatus) => {
-    // Filter out current active admin from suspension
     const targets = selectedUsersList.filter(u => !(newStatus === 'suspended' && currentUser && u.id === currentUser.id));
     if (targets.length === 0) {
       showToast('⚠️ No eligible accounts to update in selection.');
@@ -427,7 +497,6 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
   // Bulk Delete Confirmation & Execution
   const handleConfirmBulkDelete = () => {
-    // Exclude current logged in admin account for safety
     const targetsToDelete = selectedUsersList.filter(u => !(currentUser && u.id === currentUser.id));
     if (targetsToDelete.length === 0) {
       showToast('⚠️ Cannot delete your own active administrator account.');
@@ -457,20 +526,21 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
     setIsBulkDeleteModalOpen(false);
     setSelectedUserIds(new Set());
-    showToast(`Permanently deleted ${targetsToDelete.length} technician profiles from database.`);
+    showToast(`Permanently deleted ${targetsToDelete.length} technician profiles from Cloud.`);
   };
 
   // Filtered Audit Logs
   const filteredAuditLogs = useMemo(() => {
-    return auditLogs.filter(log => {
+    return (auditLogs || []).filter(log => {
+      if (!log) return false;
       const matchesSeverity = auditSeverityFilter === 'All' || log.severity === auditSeverityFilter;
       const q = auditSearchQuery.toLowerCase().trim();
       const matchesQuery = !q ||
-        log.action.toLowerCase().includes(q) ||
-        log.userEmail.toLowerCase().includes(q) ||
-        log.ip.toLowerCase().includes(q) ||
-        (log.details || '').toLowerCase().includes(q) ||
-        log.timestamp.toLowerCase().includes(q);
+        (log.action && log.action.toLowerCase().includes(q)) ||
+        (log.userEmail && log.userEmail.toLowerCase().includes(q)) ||
+        (log.ip && log.ip.toLowerCase().includes(q)) ||
+        ((log.details || '').toLowerCase().includes(q)) ||
+        (log.timestamp && log.timestamp.toLowerCase().includes(q));
 
       return matchesSeverity && matchesQuery;
     });
@@ -519,11 +589,7 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
         complianceStandard: 'NIST SP 800-92 / ISO 27001 Log Management',
         totalSystemRecords: auditLogs.length,
         exportedRecordCount: targetLogs.length,
-        isFilteredSubset: exportFilteredOnly,
-        activeFilters: exportFilteredOnly ? {
-          severity: auditSeverityFilter,
-          searchQuery: auditSearchQuery || 'none'
-        } : 'None (Full System Export)'
+        isFilteredSubset: exportFilteredOnly
       },
       auditLogs: targetLogs
     };
@@ -554,7 +620,7 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
   const getStatusBadge = (status: UserStatus) => {
     switch (status) {
-      case 'active': return <span className="px-2 py-0.5 rounded-full font-mono text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">ACTIVE</span>;
+      case 'active': return <span className="px-2 py-0.5 rounded-full font-mono text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">ACTIVE</span>;
       case 'pending': return <span className="px-2 py-0.5 rounded-full font-mono text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 animate-pulse">PENDING</span>;
       case 'suspended': return <span className="px-2 py-0.5 rounded-full font-mono text-[10px] bg-rose-500/20 text-rose-400 border border-rose-500/40">SUSPENDED</span>;
       default: return <span className="px-2 py-0.5 rounded-full font-mono text-[10px] bg-slate-500/15 text-slate-500 border border-slate-500/30">REJECTED</span>;
@@ -563,21 +629,25 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header Stat Banner */}
-      <div className="bg-[#12161f]/80 backdrop-blur-md border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+      
+      {/* Header Banner with Live Pulse */}
+      <div className="bg-[#12161f]/80 backdrop-blur-md border border-white/10 rounded-2xl p-6 relative overflow-hidden transition-all">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.6)] animate-pulse" />
+              <div className="relative flex items-center justify-center">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.8)]" />
+                <span className="absolute w-4 h-4 rounded-full bg-amber-400/40 animate-ping" />
+              </div>
               <h2 className="text-xl font-bold font-['Space_Grotesk'] text-white">
                 Admin Command Center &amp; User Access Authority
               </h2>
-              <span className="font-mono text-xs px-2.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold">
-                Admin Privilege Active
+              <span className="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold">
+                Admin Clearance Active
               </span>
             </div>
             <p className="text-sm text-slate-400 mt-1 max-w-2xl">
-              Manage technician authentication, approve new user registration requests in bulk with recorded IP addresses, assign roles, and audit security telemetry.
+              Real-time Firestore user registration approval, customized technician role assignments, station allocation, and tamper-evident audit logging.
             </p>
           </div>
 
@@ -585,28 +655,26 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
             <button
               onClick={() => handleExportAuditLogsCSV(false)}
               className="px-3 py-2 rounded-xl text-xs font-mono bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 flex items-center gap-1.5 transition-all font-semibold cursor-pointer"
-              title="Download full audit log history as CSV"
             >
               <FileText className="w-3.5 h-3.5" /> Export CSV
             </button>
             <button
               onClick={() => handleExportAuditLogsJSON(false)}
               className="px-3 py-2 rounded-xl text-xs font-mono bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 flex items-center gap-1.5 transition-all font-semibold cursor-pointer"
-              title="Download full audit log history as JSON"
             >
               <FileCode2 className="w-3.5 h-3.5" /> Export JSON
             </button>
           </div>
         </div>
 
-        {/* Quick Metric Cards */}
+        {/* Metric Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-4 border-t border-white/10">
           <div className="bg-[#181d29] p-3.5 rounded-xl border border-white/5 space-y-1">
             <span className="text-[10px] font-mono uppercase text-slate-500 block font-bold">PENDING APPROVALS</span>
             <div className="flex items-center gap-2">
               <span className="text-2xl font-bold font-mono text-amber-400">{pendingUsers.length}</span>
               {pendingUsers.length > 0 && (
-                <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">Action Req</span>
+                <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 animate-pulse">Action Req</span>
               )}
             </div>
           </div>
@@ -648,7 +716,7 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
       <div className="flex gap-2 border-b border-white/10 pb-2">
         <button
           onClick={() => { setActiveTab('pending'); handleClearSelection(); }}
-          className={`px-4 py-2 rounded-xl text-xs font-mono transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-mono transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'pending'
               ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
               : 'bg-[#181d29] text-slate-400 hover:text-white border border-white/5'
@@ -660,7 +728,7 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
         <button
           onClick={() => { setActiveTab('users'); handleClearSelection(); }}
-          className={`px-4 py-2 rounded-xl text-xs font-mono transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-mono transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'users'
               ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
               : 'bg-[#181d29] text-slate-400 hover:text-white border border-white/5'
@@ -672,7 +740,7 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
         <button
           onClick={() => { setActiveTab('audit'); handleClearSelection(); }}
-          className={`px-4 py-2 rounded-xl text-xs font-mono transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-mono transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'audit'
               ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
               : 'bg-[#181d29] text-slate-400 hover:text-white border border-white/5'
@@ -683,12 +751,10 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
         </button>
       </div>
 
-      {/* STICKY / FLOATING BULK ACTIONS TOOLBAR (Appears when 1+ users are selected) */}
+      {/* STICKY BULK ACTIONS TOOLBAR */}
       {selectedUserIds.size > 0 && (
         <div className="sticky top-4 z-40 bg-[#0f141f]/95 backdrop-blur-xl border-2 border-amber-400/60 rounded-2xl p-4 shadow-[0_10px_30px_rgba(0,0,0,0.8),0_0_20px_rgba(245,158,11,0.2)] animate-in fade-in slide-in-from-top-3">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            
-            {/* Left: Count Badge & Deselect */}
             <div className="flex items-center gap-3">
               <div className="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 font-mono text-xs font-bold flex items-center gap-2 shadow-sm">
                 <CheckSquare className="w-4 h-4" />
@@ -703,36 +769,39 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
               </button>
             </div>
 
-            {/* Right: Bulk Operations */}
             <div className="flex items-center gap-2 flex-wrap">
-              
-              {/* Bulk Approve (Shows when any pending selected or in pending tab) */}
               {(selectedPendingUsers.length > 0 || activeTab === 'pending') && (
-                <button
-                  type="button"
-                  onClick={() => handleBulkApprove()}
-                  className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
-                  title="Approve all selected pending technician accounts"
-                >
-                  <CheckCheck className="w-4 h-4" />
-                  <span>Bulk Approve ({selectedPendingUsers.length > 0 ? selectedPendingUsers.length : selectedUserIds.size})</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkApprove('bench_tech')}
+                    className="px-3 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                    <span>Approve as Bench Tech ({selectedPendingUsers.length > 0 ? selectedPendingUsers.length : selectedUserIds.size})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleBulkApprove('lead_tech')}
+                    className="px-3 py-2 rounded-xl text-xs font-mono font-bold bg-purple-500 hover:bg-purple-400 text-white flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Award className="w-4 h-4" />
+                    <span>Approve as Lead Tech</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleBulkReject}
+                    className="px-3 py-2 rounded-xl text-xs font-mono font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    <span>Reject</span>
+                  </button>
+                </>
               )}
 
-              {/* Bulk Reject (Pending Tab or pending selected) */}
-              {(selectedPendingUsers.length > 0 || activeTab === 'pending') && (
-                <button
-                  type="button"
-                  onClick={handleBulkReject}
-                  className="px-3 py-2 rounded-xl text-xs font-mono font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
-                  title="Reject selected pending registrations"
-                >
-                  <XCircle className="w-4 h-4" />
-                  <span>Bulk Reject</span>
-                </button>
-              )}
-
-              {/* Bulk Role Assign Dropdown (Directory View) */}
+              {/* Set Role Dropdown */}
               <div className="relative">
                 <button
                   type="button"
@@ -778,12 +847,11 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                 )}
               </div>
 
-              {/* Bulk Status Toggles (Suspend / Activate) */}
+              {/* Status Toggles */}
               <button
                 type="button"
                 onClick={() => handleBulkSetStatus('active')}
-                className="px-3 py-2 rounded-xl text-xs font-mono bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition-all font-semibold cursor-pointer"
-                title="Set status of all selected accounts to Active"
+                className="px-3 py-2 rounded-xl text-xs font-mono bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 font-semibold cursor-pointer"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Activate</span>
@@ -792,30 +860,27 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
               <button
                 type="button"
                 onClick={() => handleBulkSetStatus('suspended')}
-                className="px-3 py-2 rounded-xl text-xs font-mono bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition-all font-semibold cursor-pointer"
-                title="Suspend all selected accounts"
+                className="px-3 py-2 rounded-xl text-xs font-mono bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 font-semibold cursor-pointer"
               >
                 <UserMinus className="w-3.5 h-3.5" />
                 <span>Suspend</span>
               </button>
 
-              {/* Bulk Delete Trigger */}
+              {/* Bulk Delete */}
               <button
                 type="button"
                 onClick={() => setIsBulkDeleteModalOpen(true)}
                 className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Permanently purge selected technician profiles"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Bulk Delete ({selectedUserIds.size})</span>
               </button>
-
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 1: PENDING REGISTRATIONS APPROVAL QUEUE */}
+      {/* TAB 1: PENDING REGISTRATIONS APPROVAL QUEUE WITH ADMIN APPROVAL ACTIONS */}
       {activeTab === 'pending' && (
         <div className="space-y-4">
           {pendingUsers.length === 0 ? (
@@ -856,10 +921,9 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      // Select all pending and immediately approve
                       const allPendingIds = new Set(pendingUsers.map(u => u.id));
                       setSelectedUserIds(allPendingIds);
-                      handleBulkApprove();
+                      handleBulkApprove('bench_tech');
                     }}
                     className="px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
                   >
@@ -869,28 +933,29 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                 </div>
               </div>
 
-              {/* Pending Users Grid with Checkboxes */}
+              {/* Pending Users Grid with Enhanced Admin Approval Actions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {pendingUsers.map(user => {
                   const isSelected = selectedUserIds.has(user.id);
+                  const isJustApproved = approvalBadgeAnimation === user.id;
+
                   return (
                     <div
                       key={user.id}
                       className={`bg-[#12161f]/80 backdrop-blur-md rounded-2xl p-5 space-y-4 shadow-xl relative transition-all border ${
-                        isSelected 
+                        isJustApproved
+                          ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-500/[0.08]'
+                          : isSelected 
                           ? 'border-amber-400 bg-amber-500/[0.04] shadow-amber-500/10' 
                           : 'border-amber-500/40 hover:border-amber-400/60'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        
-                        {/* Checkbox + User Info */}
                         <div className="flex items-start gap-3">
                           <button
                             type="button"
                             onClick={() => handleToggleSelectUser(user.id)}
                             className="mt-0.5 p-1 rounded hover:bg-white/10 text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
-                            aria-label={`Select ${user.fullName}`}
                           >
                             {isSelected ? (
                               <CheckSquare className="w-5 h-5 text-amber-400" />
@@ -936,34 +1001,68 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
 
                         {user.notes && (
                           <div className="pt-1 text-[11px] text-slate-300 border-t border-white/5">
-                            <span className="text-slate-500 block">Applicant Notes:</span>
+                            <span className="text-slate-500 block">Applicant Specialization:</span>
                             {user.notes}
                           </div>
                         )}
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-white/10">
-                        <button
-                          onClick={() => handleApproveUser(user.id)}
-                          className="flex-1 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Approve Access
-                        </button>
-                        <button
-                          onClick={() => handleRejectUser(user.id)}
-                          className="px-3 py-2 rounded-xl text-xs font-mono bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1 cursor-pointer"
-                          title="Mark application as rejected"
-                        >
-                          <XCircle className="w-3.5 h-3.5" /> Reject
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="p-2 rounded-xl text-xs font-mono bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-white/10 hover:border-rose-500/40 flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Permanently purge application"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      {/* ADMIN APPROVAL ACTIONS BAR */}
+                      <div className="space-y-2 pt-2 border-t border-white/10">
+                        <div className="text-[10px] font-mono uppercase text-slate-400 font-bold flex items-center justify-between">
+                          <span className="flex items-center gap-1 text-amber-400">
+                            <Zap className="w-3 h-3" />
+                            Admin Approval Actions:
+                          </span>
+                        </div>
+
+                        {/* Quick Role Direct Approval Buttons */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => handleQuickApprove(user.id, 'bench_tech')}
+                            className="py-2 px-2.5 rounded-xl text-xs font-mono font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 cursor-pointer transition-all hover:scale-[1.02]"
+                            title="Approve immediately as standard Bench Technician"
+                          >
+                            <Wrench className="w-3.5 h-3.5" />
+                            <span>⚡ Bench Tech</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleQuickApprove(user.id, 'lead_tech')}
+                            className="py-2 px-2.5 rounded-xl text-xs font-mono font-bold bg-purple-500 hover:bg-purple-400 text-white flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/10 cursor-pointer transition-all hover:scale-[1.02]"
+                            title="Approve and promote to Lead Technician"
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                            <span>⚡ Lead Tech</span>
+                          </button>
+                        </div>
+
+                        {/* Advanced Custom Approval & Reject / Delete */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openApprovalModal(user)}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-mono bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1.5 font-semibold cursor-pointer"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Custom Clearance...</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleRejectUser(user.id)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-mono bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1 cursor-pointer"
+                            title="Mark application as rejected"
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-1.5 rounded-xl text-xs font-mono bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-white/10 hover:border-rose-500/40 flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Permanently purge application"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -977,7 +1076,6 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
       {/* TAB 2: MASTER USER DIRECTORY & ROLE MANAGEMENT */}
       {activeTab === 'users' && (
         <div className="space-y-4">
-          {/* Filters Bar */}
           <div className="bg-[#12161f]/80 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3">
             <div className="relative flex-1 w-full">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1017,7 +1115,6 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
             </div>
           </div>
 
-          {/* User Table with Bulk Checkboxes */}
           <div className="bg-[#12161f]/80 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono border-collapse">
@@ -1028,7 +1125,6 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                         type="button"
                         onClick={handleToggleSelectAllVisible}
                         className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
-                        title={isAllVisibleSelected ? 'Deselect all visible' : 'Select all visible'}
                       >
                         {isAllVisibleSelected ? (
                           <CheckSquare className="w-4 h-4 text-amber-400" />
@@ -1064,24 +1160,30 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                             type="button"
                             onClick={() => handleToggleSelectUser(user.id)}
                             className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
-                            aria-label={`Select ${user.fullName}`}
                           >
                             {isSelected ? (
                               <CheckSquare className="w-4 h-4 text-amber-400" />
                             ) : (
-                              <Square className="w-4 h-4 text-slate-500" />
+                              <Square className="w-4 h-4 text-slate-600" />
                             )}
                           </button>
                         </td>
+
                         <td className="py-3 px-4">
-                          <div className="font-bold text-white text-sm font-['Space_Grotesk']">{user.fullName}</div>
-                          <div className="text-[11px] text-slate-400">{user.email} · <span className="text-amber-400">{user.techCallsign}</span></div>
+                          <div className="font-bold text-white flex items-center gap-2">
+                            <span>{user.fullName}</span>
+                            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                              {user.techCallsign}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400">{user.email}</div>
                         </td>
+
                         <td className="py-3 px-4">
                           <select
                             value={user.role}
-                            onChange={e => handleChangeRole(user.id, e.target.value as UserRole)}
-                            className="bg-[#181d29] border border-white/15 rounded-lg px-2 py-1 text-xs text-white focus:border-amber-400"
+                            onChange={(e) => handleChangeRole(user.id, e.target.value as UserRole)}
+                            className="bg-[#181d29] border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:border-amber-400"
                           >
                             <option value="trainee">Trainee</option>
                             <option value="bench_tech">Bench Tech</option>
@@ -1089,48 +1191,38 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                             <option value="admin">Admin</option>
                           </select>
                         </td>
+
                         <td className="py-3 px-4">
                           {getStatusBadge(user.status)}
                         </td>
-                        <td className="py-3 px-4 text-teal-300">
+
+                        <td className="py-3 px-4 text-slate-300 font-bold">
                           {user.registeredIp || '127.0.0.1'}
                         </td>
-                        <td className="py-3 px-4 text-slate-300">
-                          {user.lastLoginIp || 'Never logged in'}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {user.status === 'pending' ? (
-                              <button
-                                onClick={() => handleApproveUser(user.id)}
-                                className="px-2.5 py-1 rounded-lg text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 cursor-pointer"
-                                title="Approve User"
-                              >
-                                Approve
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleToggleSuspend(user.id)}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-mono border cursor-pointer ${
-                                  user.status === 'suspended'
-                                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                                    : 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'
-                                }`}
-                                title={user.status === 'suspended' ? 'Reactivate' : 'Suspend'}
-                              >
-                                {user.status === 'suspended' ? 'Reactivate' : 'Suspend'}
-                              </button>
-                            )}
 
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-white/5 hover:border-rose-500/30 transition-colors cursor-pointer"
-                              title="Delete User Record"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                        <td className="py-3 px-4 text-slate-400">
+                          {user.lastLoginIp || 'Never'}
+                        </td>
+
+                        <td className="py-3 px-4 text-right space-x-2">
+                          <button
+                            onClick={() => handleToggleSuspend(user.id)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-mono border transition-colors cursor-pointer ${
+                              user.status === 'suspended'
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25'
+                                : 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                            }`}
+                          >
+                            {user.status === 'suspended' ? 'Reactivate' : 'Suspend'}
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-white/10 hover:border-rose-500/40 transition-colors cursor-pointer"
+                            title="Delete User Profile"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1138,301 +1230,269 @@ export const AdminCenter: React.FC<AdminCenterProps> = ({
                 </tbody>
               </table>
             </div>
-
-            {filteredUsers.length === 0 && (
-              <div className="p-8 text-center text-slate-400 font-mono text-xs">
-                No technicians match the current search or filters.
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* TAB 3: SECURITY & IP AUDIT LOG */}
+      {/* TAB 3: AUDIT LOGS */}
       {activeTab === 'audit' && (
         <div className="space-y-4">
-          {/* Audit Controls & Export Bar */}
-          <div className="bg-[#12161f]/80 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-            
-            {/* Search & Severity Filter */}
-            <div className="flex flex-col sm:flex-row items-center gap-2.5 flex-1">
-              <div className="relative flex-1 w-full">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={auditSearchQuery}
-                  onChange={e => setAuditSearchQuery(e.target.value)}
-                  placeholder="Filter by action, user email, IP address, or details..."
-                  className="w-full bg-[#181d29] border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:border-amber-400 font-mono"
+          <div className="bg-[#12161f]/80 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={auditSearchQuery}
+                onChange={e => setAuditSearchQuery(e.target.value)}
+                placeholder="Search audit trail by event action, email, IP address, or details..."
+                className="w-full bg-[#181d29] border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:border-amber-400 font-mono"
+              />
+            </div>
+
+            <select
+              value={auditSeverityFilter}
+              onChange={e => setAuditSeverityFilter(e.target.value)}
+              className="bg-[#181d29] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:border-amber-400"
+            >
+              <option value="All">All Severities</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+
+          <div className="bg-[#12161f]/80 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono border-collapse">
+                <thead>
+                  <tr className="bg-white/[0.03] border-b border-white/10 text-slate-400">
+                    <th className="py-3 px-4">TIMESTAMP</th>
+                    <th className="py-3 px-4">SEVERITY</th>
+                    <th className="py-3 px-4">ACTION</th>
+                    <th className="py-3 px-4">USER / EMAIL</th>
+                    <th className="py-3 px-4">SOURCE IP</th>
+                    <th className="py-3 px-4">DETAILS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredAuditLogs.map(log => (
+                    <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-4 text-slate-400 whitespace-nowrap">{log.timestamp}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${
+                          log.severity === 'critical' 
+                            ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' 
+                            : log.severity === 'warning'
+                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                            : 'bg-sky-500/15 text-sky-400 border-sky-500/30'
+                        }`}>
+                          {log.severity}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-bold text-white">{log.action}</td>
+                      <td className="py-3 px-4 text-slate-300">{log.userEmail}</td>
+                      <td className="py-3 px-4 text-teal-300 font-bold">{log.ip}</td>
+                      <td className="py-3 px-4 text-slate-400 max-w-md truncate" title={log.details}>
+                        {log.details}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM ADMIN APPROVAL ACTIONS MODAL */}
+      {approvalTargetUser && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#10141f] border border-amber-400/40 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-400 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
+                    Technician Commissioning &amp; Approval
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">Commissioning {approvalTargetUser.fullName} ({approvalTargetUser.email})</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setApprovalTargetUser(null)}
+                className="text-slate-400 hover:text-white font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs font-mono">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-400">Assigned Clearance Role</label>
+                  <select
+                    value={approvalRole}
+                    onChange={(e) => setApprovalRole(e.target.value as UserRole)}
+                    className="w-full bg-[#181d29] border border-white/10 rounded-xl px-3 py-2 text-white focus:border-amber-400"
+                  >
+                    <option value="bench_tech">Bench Technician</option>
+                    <option value="lead_tech">Lead Technician</option>
+                    <option value="trainee">Apprentice / Trainee</option>
+                    <option value="admin">Full Administrator</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-slate-400">Assigned Tech Callsign</label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={approvalCallsign}
+                      onChange={(e) => setApprovalCallsign(e.target.value)}
+                      placeholder="TECH-01"
+                      className="flex-1 bg-[#181d29] border border-white/10 rounded-xl px-3 py-2 text-amber-300 font-bold focus:border-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setApprovalCallsign(`TECH-${Math.floor(10 + Math.random() * 89)}`)}
+                      className="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 cursor-pointer"
+                      title="Generate random callsign"
+                    >
+                      🎲
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-400">Assigned Bench / Workstation</label>
+                <select
+                  value={approvalStation}
+                  onChange={(e) => setApprovalStation(e.target.value)}
+                  className="w-full bg-[#181d29] border border-white/10 rounded-xl px-3 py-2 text-white focus:border-amber-400"
+                >
+                  <option value="Bench Station #1 (Hardware Diagnostics)">Bench Station #1 (Hardware Diagnostics)</option>
+                  <option value="Bench Station #2 (SMD Micro-Soldering & Board Repair)">Bench Station #2 (SMD Micro-Soldering & Board Repair)</option>
+                  <option value="Bench Station #3 (OS, Firmware & BIOS Flashing)">Bench Station #3 (OS, Firmware & BIOS Flashing)</option>
+                  <option value="Bench Station #4 (Data Recovery & Storage)">Bench Station #4 (Data Recovery & Storage)</option>
+                  <option value="Mobile / Remote Diagnostics Dispatch">Mobile / Remote Diagnostics Dispatch</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-400">Administrator Approval Statement &amp; Clearance Notes</label>
+                <textarea
+                  rows={2}
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  placeholder="e.g. Identity and ESD certifications verified. Access granted to diagnostic equipment."
+                  className="w-full bg-[#181d29] border border-white/10 rounded-xl px-3 py-2 text-white focus:border-amber-400 font-sans"
                 />
               </div>
 
-              <select
-                value={auditSeverityFilter}
-                onChange={e => setAuditSeverityFilter(e.target.value)}
-                className="w-full sm:w-auto bg-[#181d29] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:border-amber-400"
-              >
-                <option value="All">All Severities ({auditLogs.length})</option>
-                <option value="critical">Critical Only ({auditLogs.filter(l => l.severity === 'critical').length})</option>
-                <option value="warning">Warnings ({auditLogs.filter(l => l.severity === 'warning').length})</option>
-                <option value="info">Informational ({auditLogs.filter(l => l.severity === 'info').length})</option>
-              </select>
-            </div>
-
-            {/* Export Action Buttons */}
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              <div className="flex items-center rounded-xl bg-[#181d29] p-1 border border-white/10 font-mono text-xs">
-                <button
-                  type="button"
-                  onClick={() => handleExportAuditLogsCSV(auditSearchQuery !== '' || auditSeverityFilter !== 'All')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-all font-bold cursor-pointer"
-                  title="Download as CSV spreadsheet format"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Download CSV</span>
-                </button>
-
-                <div className="h-4 w-px bg-white/10 mx-1" />
-
-                <button
-                  type="button"
-                  onClick={() => handleExportAuditLogsJSON(auditSearchQuery !== '' || auditSeverityFilter !== 'All')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 transition-all font-bold cursor-pointer"
-                  title="Download as JSON raw data structure"
-                >
-                  <FileCode2 className="w-3.5 h-3.5" />
-                  <span>Download JSON</span>
-                </button>
-              </div>
-
-              {(auditSearchQuery !== '' || auditSeverityFilter !== 'All') && (
-                <button
-                  type="button"
-                  onClick={() => { setAuditSearchQuery(''); setAuditSeverityFilter('All'); }}
-                  className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs font-mono border border-white/10 transition-all cursor-pointer"
-                  title="Reset search and filters"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-
-          </div>
-
-          {/* Audit Logs Table / Feed */}
-          <div className="bg-[#0b0e14] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 bg-white/[0.03] border-b border-white/10 text-xs font-mono gap-2">
-              <span className="text-slate-200 font-bold flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Historical Security Telemetry &amp; IP Access Log</span>
-                <span className="text-slate-400 text-[11px] font-normal">
-                  (Showing {filteredAuditLogs.length} of {auditLogs.length} Records)
-                </span>
-              </span>
-
-              <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                  🛡️ NIST / ISO 27001 Ready
-                </span>
-                <span>Tamper-Evident Real-time Sync</span>
-              </div>
-            </div>
-
-            {filteredAuditLogs.length > 0 ? (
-              <div className="divide-y divide-white/5 max-h-[520px] overflow-y-auto font-mono text-xs">
-                {filteredAuditLogs.map(log => (
-                  <div key={log.id} className="p-3.5 hover:bg-white/[0.02] flex items-start justify-between gap-4 transition-colors">
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-slate-500 text-[10px]">[{log.timestamp}]</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          log.severity === 'critical'
-                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                            : log.severity === 'warning'
-                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                            : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
-                        }`}>
-                          {log.action}
-                        </span>
-                        <span className="text-slate-200 font-bold truncate">{log.userEmail}</span>
-                        {log.userId && (
-                          <span className="text-slate-500 text-[10px]">({log.userId})</span>
-                        )}
-                      </div>
-                      <p className="text-slate-300 text-[11px] leading-relaxed break-words">{log.details}</p>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="flex items-center gap-1 text-teal-300 font-bold justify-end text-[11px]">
-                        <Globe className="w-3 h-3" />
-                        <span>{log.ip}</span>
-                      </div>
-                      <span className="text-[10px] text-slate-500 block max-w-[220px] truncate mt-0.5" title={log.userAgent}>
-                        {log.userAgent}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-12 text-center space-y-3 font-mono">
-                <ShieldAlert className="w-10 h-10 text-slate-600 mx-auto" />
-                <div className="text-sm font-bold text-slate-300">No matching audit records found</div>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Try adjusting your search keywords or severity filters to view historical security events.
+              <div className="bg-[#181d29] p-3 rounded-xl border border-emerald-500/20 text-[11px] text-emerald-300 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Key className="w-3.5 h-3.5" />
+                  <span>Security Token Provisioned</span>
+                </div>
+                <p className="text-slate-400 text-[10px]">
+                  Upon confirmation, technician's status will switch to ACTIVE in Cloud Firestore. They can immediately log in from any browser.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => { setAuditSearchQuery(''); setAuditSeverityFilter('All'); }}
-                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs transition-all cursor-pointer"
-                >
-                  Clear Filters
-                </button>
-              </div>
-            )}
-
-            {/* Bottom Footer Info */}
-            <div className="px-4 py-2.5 bg-white/[0.02] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between text-[11px] font-mono text-slate-400 gap-2">
-              <span>All administrative actions, authentication attempts, role changes, and IP addresses are recorded chronologically.</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleExportAuditLogsCSV(false)}
-                  className="text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Download className="w-3 h-3" /> Export Full History (CSV)
-                </button>
-                <span>·</span>
-                <button
-                  onClick={() => handleExportAuditLogsJSON(false)}
-                  className="text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Download className="w-3 h-3" /> Export Full History (JSON)
-                </button>
               </div>
             </div>
 
+            <div className="flex gap-3 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setApprovalTargetUser(null)}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-mono text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteApproval}
+                className="flex-1 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-mono text-xs font-bold shadow-lg shadow-amber-400/20 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Authorize &amp; Commission</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* SINGLE USER DELETION CONFIRMATION MODAL */}
+      {/* DELETE SINGLE USER MODAL */}
       {userToDelete && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#12161f] border border-rose-500/40 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-start gap-3">
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 shrink-0">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
-                  Permanently Delete Technician Profile?
-                </h3>
-                <p className="text-xs text-slate-400">
-                  This action cannot be undone. All access credentials and technician identity records will be purged.
-                </p>
-              </div>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#141824] border border-rose-500/40 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
             </div>
 
-            <div className="bg-[#181d29] p-4 rounded-xl border border-white/10 space-y-2 font-mono text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Technician:</span>
-                <span className="text-white font-bold">{userToDelete.fullName}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Email:</span>
-                <span className="text-slate-300">{userToDelete.email}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Callsign:</span>
-                <span className="text-amber-400 font-bold">{userToDelete.techCallsign}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Role:</span>
-                <span className="text-slate-300 uppercase">{userToDelete.role}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Registered IP:</span>
-                <span className="text-teal-400">{userToDelete.registeredIp || '127.0.0.1'}</span>
-              </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
+                Permanently Delete Technician?
+              </h3>
+              <p className="text-xs text-slate-400 font-mono">
+                This will delete <strong className="text-white">{userToDelete.fullName}</strong> ({userToDelete.email}, Callsign: {userToDelete.techCallsign}) from the Cloud database.
+              </p>
             </div>
 
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-300 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
-              <span>A tamper-evident critical audit log entry will be permanently written to the system ledger.</span>
-            </div>
-
-            <div className="flex items-center gap-2.5 pt-2 border-t border-white/10">
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setUserToDelete(null)}
-                className="flex-1 py-2.5 rounded-xl font-mono text-xs bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all cursor-pointer font-semibold"
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-mono text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmSingleDelete}
-                className="flex-1 py-2.5 rounded-xl font-mono text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold shadow-lg shadow-rose-600/30 cursor-pointer"
               >
-                <Trash2 className="w-4 h-4" />
-                <span>Delete Permanently</span>
+                Delete Account
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* BULK USERS DELETION CONFIRMATION MODAL */}
+      {/* BULK DELETE MODAL */}
       {isBulkDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#12161f] border border-rose-500/40 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-start gap-3">
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 shrink-0">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
-                  Bulk Delete {selectedUserIds.size} Technician Profiles?
-                </h3>
-                <p className="text-xs text-slate-400">
-                  This irreversible action will permanently purge {selectedUserIds.size} user records and their access credentials from the cloud database.
-                </p>
-              </div>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#141824] border border-rose-500/40 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
             </div>
 
-            {/* List of target users */}
-            <div className="bg-[#181d29] p-3 rounded-xl border border-white/10 max-h-48 overflow-y-auto space-y-1.5 font-mono text-xs">
-              {selectedUsersList.map(u => (
-                <div key={u.id} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
-                  <div>
-                    <span className="text-white font-bold">{u.fullName}</span>
-                    <span className="text-slate-400 text-[11px] ml-2">({u.email})</span>
-                  </div>
-                  <span className="text-amber-400 font-semibold">{u.techCallsign}</span>
-                </div>
-              ))}
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-white font-['Space_Grotesk']">
+                Delete {selectedUserIds.size} Selected Accounts?
+              </h3>
+              <p className="text-xs text-slate-400 font-mono">
+                These technician records will be permanently removed from Cloud Firestore across all devices.
+              </p>
             </div>
 
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] font-mono text-rose-300 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
-              <span>Your active administrator session is protected and will not be deleted.</span>
-            </div>
-
-            <div className="flex items-center gap-2.5 pt-2 border-t border-white/10">
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setIsBulkDeleteModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl font-mono text-xs bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all cursor-pointer font-semibold"
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-mono text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmBulkDelete}
-                className="flex-1 py-2.5 rounded-xl font-mono text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold shadow-lg shadow-rose-600/30 cursor-pointer"
               >
-                <Trash2 className="w-4 h-4" />
-                <span>Delete All Selected ({selectedUserIds.size})</span>
+                Delete All {selectedUserIds.size}
               </button>
             </div>
           </div>

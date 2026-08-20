@@ -19,7 +19,7 @@ interface LoginPageProps {
 type PreviewTab = 'errors' | 'cheatsheets' | 'subnet' | 'pinouts' | 'ticketing' | 'serial';
 
 export const LoginPage: React.FC<LoginPageProps> = ({
-  users,
+  users = [],
   onLoginSuccess,
   onRegisterSubmit,
   isOnline
@@ -54,9 +54,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
 
-    const targetUser = users.find(u => 
-      (u.email.toLowerCase() === loginIdentifier.toLowerCase().trim() ||
-       u.techCallsign.toLowerCase() === loginIdentifier.toLowerCase().trim()) &&
+    const targetUser = (users || []).find(u => 
+      u &&
+      ((u.email && u.email.toLowerCase() === loginIdentifier.toLowerCase().trim()) ||
+       (u.techCallsign && u.techCallsign.toLowerCase() === loginIdentifier.toLowerCase().trim())) &&
       u.passwordHash === loginPassword
     );
 

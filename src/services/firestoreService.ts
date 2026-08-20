@@ -7,7 +7,6 @@ import {
   updateDoc, 
   deleteDoc, 
   query, 
-  orderBy,
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -22,6 +21,9 @@ const TICKETS_COLLECTION = 'wb_tickets';
 // Seed initial system users if Firestore collection is completely empty
 export async function seedInitialDataIfEmpty() {
   try {
+    const seeded = localStorage.getItem('wb_cloud_seeded_v2');
+    if (seeded) return;
+
     const userSnap = await getDocs(collection(db, USERS_COLLECTION));
     if (userSnap.empty) {
       const batch = writeBatch(db);
@@ -39,6 +41,7 @@ export async function seedInitialDataIfEmpty() {
       }
       await batch.commit();
     }
+    localStorage.setItem('wb_cloud_seeded_v2', 'true');
   } catch (error) {
     console.warn('Firebase auto-seed notice (offline or initial connection):', error);
   }
@@ -49,22 +52,17 @@ export function subscribeToUsers(onUpdate: (users: User[]) => void) {
   try {
     const q = query(collection(db, USERS_COLLECTION));
     return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const usersList: User[] = [];
-        snapshot.forEach((docSnap) => {
-          usersList.push(docSnap.data() as User);
-        });
-        // Sort: pending first, then by date
-        usersList.sort((a, b) => {
-          if (a.status === 'pending' && b.status !== 'pending') return -1;
-          if (a.status !== 'pending' && b.status === 'pending') return 1;
-          return new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime();
-        });
-        onUpdate(usersList);
-      } else {
-        // If empty in cloud, seed it
-        seedInitialDataIfEmpty();
-      }
+      const usersList: User[] = [];
+      snapshot.forEach((docSnap) => {
+        usersList.push(docSnap.data() as User);
+      });
+      // Sort: pending first, then by date
+      usersList.sort((a, b) => {
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        return new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime();
+      });
+      onUpdate(usersList);
     }, (error) => {
       console.warn('Firestore users subscription error:', error);
     });
@@ -134,9 +132,7 @@ export function subscribeToAuditLogs(onUpdate: (logs: SecurityAuditLog[]) => voi
       });
       // Sort newest first
       logsList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      if (logsList.length > 0) {
-        onUpdate(logsList);
-      }
+      onUpdate(logsList);
     }, (error) => {
       console.warn('Firestore audit logs subscription error:', error);
     });
@@ -156,7 +152,7 @@ export async function addAuditLogToCloud(log: SecurityAuditLog): Promise<void> {
   }
 }
 
-// Real-time Tickets Listener
+// Real-time Tickets Listener (Live multi-user sync)
 export function subscribeToTickets(onUpdate: (tickets: JobTicket[]) => void) {
   try {
     const q = query(collection(db, TICKETS_COLLECTION));
@@ -165,9 +161,13 @@ export function subscribeToTickets(onUpdate: (tickets: JobTicket[]) => void) {
       snapshot.forEach((docSnap) => {
         ticketList.push(docSnap.data() as JobTicket);
       });
-      if (ticketList.length > 0) {
-        onUpdate(ticketList);
-      }
+      // Sort newest first by creation timestamp or fallback
+      ticketList.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      onUpdate(ticketList);
     }, (error) => {
       console.warn('Firestore tickets subscription error:', error);
     });
@@ -184,6 +184,30 @@ export async function saveTicketToCloud(ticket: JobTicket): Promise<void> {
     await setDoc(ticketRef, ticket, { merge: true });
   } catch (error) {
     console.error('Error saving ticket to Firestore:', error);
+  }
+}
+
+// Delete single ticket from Cloud Firestore
+export async function deleteTicketFromCloud(ticketId: string): Promise<void> {
+  try {
+    const ticketRef = doc(db, TICKETS_COLLECTION, ticketId);
+    await deleteDoc(ticketRef);
+  } catch (error) {
+    console.error('Error deleting ticket from Firestore:', error);
+  }
+}
+
+// Bulk delete multiple tickets from Cloud Firestore
+export async function deleteTicketsFromCloud(ticketIds: string[]): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    for (const ticketId of ticketIds) {
+      const ticketRef = doc(db, TICKETS_COLLECTION, ticketId);
+      batch.delete(ticketRef);
+    }
+    await batch.commit();
+  } catch (error) {
+    console.error('Error deleting tickets batch from Firestore:', error);
   }
 }
 

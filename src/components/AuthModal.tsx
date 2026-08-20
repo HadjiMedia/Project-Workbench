@@ -17,7 +17,7 @@ interface AuthModalProps {
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
-  users,
+  users = [],
   onLoginSuccess,
   onRegisterSubmit
 }) => {
@@ -55,9 +55,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setErrorMsg('');
 
-    const targetUser = users.find(u => 
-      (u.email.toLowerCase() === loginIdentifier.toLowerCase().trim() ||
-       u.techCallsign.toLowerCase() === loginIdentifier.toLowerCase().trim()) &&
+    const targetUser = (users || []).find(u => 
+      u &&
+      ((u.email && u.email.toLowerCase() === loginIdentifier.toLowerCase().trim()) ||
+       (u.techCallsign && u.techCallsign.toLowerCase() === loginIdentifier.toLowerCase().trim())) &&
       u.passwordHash === loginPassword
     );
 

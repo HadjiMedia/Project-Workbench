@@ -9,8 +9,12 @@ import {
   saveUserToCloud, 
   updateUsersInCloud,
   deleteUserFromCloud,
+  deleteUsersFromCloud,
   addAuditLogToCloud, 
+  saveTicketToCloud,
   saveTicketsInCloud,
+  deleteTicketFromCloud,
+  deleteTicketsFromCloud,
   seedInitialDataIfEmpty
 } from './services/firestoreService';
 
@@ -74,7 +78,7 @@ export function App() {
     }
   });
 
-  // Centralized Repair Job Tickets
+  // Centralized Repair Job Tickets (Cloud Firestore Synced)
   const [tickets, setTickets] = useState<JobTicket[]>(() => {
     try {
       const saved = localStorage.getItem('wb_repair_tickets');
@@ -89,7 +93,7 @@ export function App() {
     seedInitialDataIfEmpty();
 
     const unsubUsers = subscribeToUsers((cloudUsers) => {
-      if (cloudUsers && cloudUsers.length > 0) {
+      if (cloudUsers) {
         setUsers(cloudUsers);
         localStorage.setItem('wb_users', JSON.stringify(cloudUsers));
 
@@ -98,7 +102,10 @@ export function App() {
           if (!prev) return null;
           const matched = cloudUsers.find(u => u.id === prev.id);
           if (matched) {
-            localStorage.setItem('wb_current_user', JSON.stringify(matched));
+            // Auto logout if suspended or rejected
+            if (matched.status === 'suspended' || matched.status === 'rejected') {
+              return null;
+            }
             return matched;
           }
           return prev;
@@ -107,14 +114,14 @@ export function App() {
     });
 
     const unsubAudit = subscribeToAuditLogs((cloudLogs) => {
-      if (cloudLogs && cloudLogs.length > 0) {
+      if (cloudLogs) {
         setAuditLogs(cloudLogs);
         localStorage.setItem('wb_audit_logs', JSON.stringify(cloudLogs));
       }
     });
 
     const unsubTickets = subscribeToTickets((cloudTickets) => {
-      if (cloudTickets && cloudTickets.length > 0) {
+      if (cloudTickets) {
         setTickets(cloudTickets);
         localStorage.setItem('wb_repair_tickets', JSON.stringify(cloudTickets));
       }
@@ -148,35 +155,23 @@ export function App() {
     }
   }, [currentUser]);
 
-  const [activeInvoiceTicket, setActiveInvoiceTicket] = useState<JobTicket | null>(null);
+  // Modals & Navigation state
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCmdkOpen, setIsCmdkOpen] = useState(false);
   const [isVaultModalOpen, setIsVaultModalOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [isVaultUnlocked, setIsVaultUnlocked] = useState(false);
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Sync tab change with strict RBAC enforcement
-  const handleTabChange = useCallback((tab: TabId) => {
-    if (tab === 'admin' && currentUser?.role !== 'admin') {
-      // Prevent non-admin users from switching to admin tab
-      setActiveTab('overview');
-      localStorage.setItem('wb_active_tab', 'overview');
-      return;
-    }
+  // Active ticket being converted to invoice
+  const [activeInvoiceTicket, setActiveInvoiceTicket] = useState<JobTicket | null>(null);
+
+  const handleTabChange = (tab: TabId) => {
     setActiveTab(tab);
     localStorage.setItem('wb_active_tab', tab);
-  }, [currentUser]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-  // Ensure non-admins are immediately redirected away from admin tab if permissions change
-  useEffect(() => {
-    if (activeTab === 'admin' && currentUser?.role !== 'admin') {
-      setActiveTab('overview');
-      localStorage.setItem('wb_active_tab', 'overview');
-    }
-  }, [currentUser, activeTab]);
-
-  // Open ticket directly in Invoice Generator
   const handleOpenTicketInvoice = (ticket: JobTicket) => {
     setActiveInvoiceTicket(ticket);
     handleTabChange('invoice');
@@ -252,7 +247,6 @@ export function App() {
 
   const handleDeleteUsers = async (userIds: string[]) => {
     setUsers(prev => prev.filter(u => !userIds.includes(u.id)));
-    const { deleteUsersFromCloud } = await import('./services/firestoreService');
     await deleteUsersFromCloud(userIds);
   };
 
@@ -261,9 +255,29 @@ export function App() {
     await addAuditLogToCloud(log);
   };
 
+  // Real-time Ticket Handlers (Full Cloud Sync)
   const handleUpdateTickets = async (updatedTickets: JobTicket[]) => {
     setTickets(updatedTickets);
     await saveTicketsInCloud(updatedTickets);
+  };
+
+  const handleSaveTicket = async (ticket: JobTicket) => {
+    setTickets(prev => {
+      const exists = prev.some(t => t.id === ticket.id);
+      if (exists) return prev.map(t => t.id === ticket.id ? ticket : t);
+      return [ticket, ...prev];
+    });
+    await saveTicketToCloud(ticket);
+  };
+
+  const handleDeleteTicket = async (ticketId: string) => {
+    setTickets(prev => prev.filter(t => t.id !== ticketId));
+    await deleteTicketFromCloud(ticketId);
+  };
+
+  const handleDeleteTickets = async (ticketIds: string[]) => {
+    setTickets(prev => prev.filter(t => !ticketIds.includes(t.id)));
+    await deleteTicketsFromCloud(ticketIds);
   };
 
   // Keyboard shortcut listener for Ctrl+K
@@ -290,14 +304,14 @@ export function App() {
     };
   }, []);
 
-  const pendingCount = users.filter(u => u.status === 'pending').length;
-  const openTicketsCount = tickets.filter(t => t.status !== 'Completed' && t.status !== 'Cancelled').length;
+  const pendingCount = (users || []).filter(u => u && u.status === 'pending').length;
+  const openTicketsCount = (tickets || []).filter(t => t && t.status !== 'Completed' && t.status !== 'Cancelled').length;
 
   // Strict Authentication Gate
   if (!currentUser) {
     return (
       <LoginPage
-        users={users}
+        users={users || []}
         onLoginSuccess={handleLoginSuccess}
         onRegisterSubmit={handleRegisterSubmit}
         isOnline={isOnline}
@@ -318,23 +332,67 @@ export function App() {
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onLogout={handleLogout}
         currentUser={currentUser}
-        pendingUsersCount={pendingCount}
+        pendingApprovalsCount={pendingCount}
         openTicketsCount={openTicketsCount}
-        isVaultUnlocked={isVaultUnlocked}
-        isOnline={isOnline}
       />
 
-      {/* Main Viewport Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+      {/* Main Content Viewport */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+        
+        {/* Top Header Bar with Live Real-time Indicator & Quick Command Trigger */}
+        <header className="no-print h-14 border-b border-white/5 bg-[#0a0d13]/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs text-slate-400 uppercase tracking-wider">
+              {activeTab === 'overview' && 'Workbench Operational Dashboard'}
+              {activeTab === 'tickets' && 'Job Intake & Diagnostic Tickets'}
+              {activeTab === 'invoice' && 'Work Order & Invoice Generator'}
+              {activeTab === 'qr' && 'QR Intake & Tagging Suite'}
+              {activeTab === 'errors' && 'POST & BlueScreen Diagnostics Matrix'}
+              {activeTab === 'psu' && 'Power Supply & Rail Headroom Calculator'}
+              {activeTab === 'serial' && 'Serial / UART Web Diagnostic Terminal'}
+              {activeTab === 'motherboard' && 'Interactive Motherboard VRM Map'}
+              {activeTab === 'pinouts' && 'ATX / PCIe / USB Pinout Visualizer'}
+              {activeTab === 'scripts' && 'Automated Repair Script Generator'}
+              {activeTab === 'techsuite' && 'Bootable USB & Diagnostic Tool Matrix'}
+              {activeTab === 'cheatsheets' && 'Hardware Pinouts & Resistor Cheat Sheets'}
+              {activeTab === 'kb' && 'Technician Knowledge Base & Secret Vault'}
+              {activeTab === 'admin' && 'Admin Command Center & User Access Authority'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Live Firestore Connectivity Status */}
+            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Cloud Sync Active</span>
+            </div>
+
+            {/* Quick Command Trigger */}
+            <button
+              onClick={() => setIsCmdkOpen(true)}
+              className="hidden md:flex items-center gap-2 px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-mono text-slate-400 border border-white/10 transition-colors cursor-pointer"
+            >
+              <span>Command Palette</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-slate-300 font-bold border border-white/10">
+                Ctrl+K
+              </kbd>
+            </button>
+          </div>
+        </header>
+
+        {/* Dynamic Route View */}
+        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
           
-          {/* Operations: Overview Dashboard */}
+          {/* Main Dashboard Overview */}
           {activeTab === 'overview' && (
-            <OverviewDashboard
+            <OverviewDashboard 
               currentUser={currentUser}
-              users={users}
-              tickets={tickets}
-              auditLogs={auditLogs}
+              users={users || []}
+              tickets={tickets || []}
+              auditLogs={auditLogs || []}
               onNavigateTab={handleTabChange}
               onOpenInvoice={handleOpenTicketInvoice}
               isOnline={isOnline}
@@ -347,6 +405,9 @@ export function App() {
               onOpenInvoice={handleOpenTicketInvoice} 
               tickets={tickets}
               onUpdateTickets={handleUpdateTickets}
+              onSaveTicket={handleSaveTicket}
+              onDeleteTicket={handleDeleteTicket}
+              onDeleteTickets={handleDeleteTickets}
             />
           )}
 

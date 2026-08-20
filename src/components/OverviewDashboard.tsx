@@ -20,9 +20,9 @@ interface OverviewDashboardProps {
 
 export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   currentUser,
-  users,
-  tickets,
-  auditLogs,
+  users = [],
+  tickets = [],
+  auditLogs = [],
   onNavigateTab,
   onOpenInvoice,
   isOnline
@@ -30,30 +30,31 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const [auditFilter, setAuditFilter] = useState<'critical_warning' | 'critical_only' | 'all'>('critical_warning');
   const [ticketFilter, setTicketFilter] = useState<'all_active' | 'urgent_only'>('all_active');
 
-  // Compute metrics
-  const pendingUsers = users.filter(u => u.status === 'pending');
-  const activeUsers = users.filter(u => u.status === 'active');
+  // Compute metrics defensively
+  const pendingUsers = (users || []).filter(u => u && u.status === 'pending');
+  const activeUsers = (users || []).filter(u => u && u.status === 'active');
   
   // Active tickets = any ticket not Completed or Cancelled
-  const activeTickets = tickets.filter(t => t.status !== 'Completed' && t.status !== 'Cancelled');
-  const urgentTickets = activeTickets.filter(t => t.priority === 'Urgent' || t.priority === 'Critical');
-  const completedTickets = tickets.filter(t => t.status === 'Completed');
+  const activeTickets = (tickets || []).filter(t => t && t.status !== 'Completed' && t.status !== 'Cancelled');
+  const urgentTickets = activeTickets.filter(t => t && (t.priority === 'Urgent' || t.priority === 'Critical'));
+  const completedTickets = (tickets || []).filter(t => t && t.status === 'Completed');
 
   // Critical / Warning Audit logs
-  const criticalLogs = auditLogs.filter(l => l.severity === 'critical');
-  const warningLogs = auditLogs.filter(l => l.severity === 'warning');
-  const filteredAuditLogs = auditLogs.filter(l => {
+  const criticalLogs = (auditLogs || []).filter(l => l && l.severity === 'critical');
+  const warningLogs = (auditLogs || []).filter(l => l && l.severity === 'warning');
+  const filteredAuditLogs = (auditLogs || []).filter(l => {
+    if (!l) return false;
     if (auditFilter === 'critical_only') return l.severity === 'critical';
     if (auditFilter === 'critical_warning') return l.severity === 'critical' || l.severity === 'warning';
     return true;
   }).slice(0, 6);
 
   // Status breakdown for active tickets
-  const inDiagCount = activeTickets.filter(t => t.status === 'In Diagnostics').length;
-  const inRepairCount = activeTickets.filter(t => t.status === 'Repair In Progress').length;
-  const awaitingPartsCount = activeTickets.filter(t => t.status === 'Awaiting Parts').length;
-  const testingQaCount = activeTickets.filter(t => t.status === 'Testing / QA').length;
-  const readyPickupCount = activeTickets.filter(t => t.status === 'Ready for Pickup').length;
+  const inDiagCount = activeTickets.filter(t => t && t.status === 'In Diagnostics').length;
+  const inRepairCount = activeTickets.filter(t => t && t.status === 'Repair In Progress').length;
+  const awaitingPartsCount = activeTickets.filter(t => t && t.status === 'Awaiting Parts').length;
+  const testingQaCount = activeTickets.filter(t => t && t.status === 'Testing / QA').length;
+  const readyPickupCount = activeTickets.filter(t => t && t.status === 'Ready for Pickup').length;
 
   return (
     <div className="space-y-6 font-sans">
