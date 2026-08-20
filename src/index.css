@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: #090b10;
+    color: #e6e9f0;
+    background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      radial-gradient(circle at 15% 0%, rgba(245, 158, 11, 0.05), transparent 45%),
+      radial-gradient(circle at 85% 10%, rgba(168, 85, 247, 0.06), transparent 45%);
+    background-size: 32px 32px, 32px 32px, 100% 100%, 100% 100%;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+
+  code, kbd, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #090b10;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f293d;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Keyboard badge */
+kbd {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 5px;
+  padding: 1.5px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* Print Stylesheet for Work Order, Invoices & Cheat Sheets */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    background-image: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 11pt !important;
+  }
+
+  /* Hide everything marked no-print */
+  header, nav, footer, .no-print, #toast-stack, button.no-print, .interactive-controls {
+    display: none !important;
+  }
+
+  .print-only-container, main {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Optimize cards & tables for crisp print */
+  div, section, article {
+    background-color: transparent !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+  }
+
+  table {
+    border: 1px solid #cbd5e1 !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #e2e8f0 !important;
+    color: #0f172a !important;
+    padding: 6px 8px !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
+  }
+
+  kbd, pre, code {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  .print-break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Workbench Diagnostics & Software Repair Console",
+  "description": "Comprehensive technical diagnostic workbench, Windows error matrix, PSU rail calculator, batch script generator, ticketing & work order system, interactive pinouts, and Web Serial POST analyzer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

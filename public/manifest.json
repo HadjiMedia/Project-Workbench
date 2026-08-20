@@ -1,0 +1,17 @@
+{
+  "short_name": "Workbench",
+  "name": "Workbench Technical Diagnostics & Software Repair Console",
+  "description": "Professional hardware & software diagnostics console, Windows error matrix, PSU calculator, script builder, ticketing system, and pinout analyzer.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#090b10",
+  "theme_color": "#f59e0b",
+  "display": "standalone",
+  "orientation": "any"
+}
