@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TabId, JobTicket, User, SecurityAuditLog } from './types';
 import { INITIAL_USERS, INITIAL_AUDIT_LOGS } from './data/usersData';
 import { INITIAL_TICKETS } from './data/sampleTickets';
+
 import { Navigation } from './components/Navigation';
 import { OverviewDashboard } from './components/OverviewDashboard';
+import { QrCodeSuite } from './components/QrCodeSuite';
 import { ErrorMatrix } from './components/ErrorMatrix';
 import { PsuCalculator } from './components/PsuCalculator';
 import { ScriptGenerator } from './components/ScriptGenerator';
@@ -71,7 +73,7 @@ export function App() {
     }
   });
 
-  // Persist Users, Logs & Tickets
+  // Persist State
   useEffect(() => {
     localStorage.setItem('wb_users', JSON.stringify(users));
   }, [users]);
@@ -115,10 +117,8 @@ export function App() {
   // Auth Handlers
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
-    // Update last login in users state
     setUsers(prev => prev.map(u => u.id === user.id ? user : u));
 
-    // Audit log
     const log: SecurityAuditLog = {
       id: 'log_' + Date.now(),
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
@@ -127,7 +127,7 @@ export function App() {
       action: 'USER_LOGIN_SUCCESS',
       ip: user.lastLoginIp || '127.0.0.1',
       userAgent: navigator.userAgent,
-      details: `User ${user.fullName} logged in successfully with role ${user.role.toUpperCase()}`,
+      details: `Technician ${user.fullName} (${user.techCallsign}) logged in as ${user.role.toUpperCase()}`,
       severity: 'info'
     };
     setAuditLogs(prev => [log, ...prev]);
@@ -143,15 +143,12 @@ export function App() {
         action: 'USER_LOGOUT',
         ip: currentUser.lastLoginIp || '127.0.0.1',
         userAgent: navigator.userAgent,
-        details: `User ${currentUser.fullName} signed out`,
+        details: `Technician ${currentUser.fullName} signed out`,
         severity: 'info'
       };
       setAuditLogs(prev => [log, ...prev]);
     }
     setCurrentUser(null);
-    if (activeTab === 'admin') {
-      setActiveTab('errors');
-    }
   };
 
   const handleRegisterSubmit = (newUser: User, auditLog: SecurityAuditLog) => {
@@ -161,7 +158,6 @@ export function App() {
 
   const handleUpdateUsers = (updatedUsers: User[]) => {
     setUsers(updatedUsers);
-    // If current user modified, update session
     if (currentUser) {
       const refreshed = updatedUsers.find(u => u.id === currentUser.id);
       if (refreshed) setCurrentUser(refreshed);
@@ -197,8 +193,9 @@ export function App() {
   }, []);
 
   const pendingCount = users.filter(u => u.status === 'pending').length;
+  const openTicketsCount = tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length;
 
-  // Strict Authentication & Preview Gate
+  // Strict Authentication Gate
   if (!currentUser) {
     return (
       <LoginPage
@@ -211,25 +208,29 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#090c12] text-slate-100 flex flex-col selection:bg-amber-400 selection:text-slate-950 font-sans">
-      {/* Top Banner & Navigation Container */}
-      <div className="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 flex-1">
-        <Navigation
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          onOpenCmdk={() => setIsCmdkOpen(true)}
-          onOpenVault={() => setIsVaultModalOpen(true)}
-          onOpenBackup={() => setIsBackupModalOpen(true)}
-          onOpenAuth={() => setIsAuthModalOpen(true)}
-          onLogout={handleLogout}
-          currentUser={currentUser}
-          pendingUsersCount={pendingCount}
-          isVaultUnlocked={isVaultUnlocked}
-          isOnline={isOnline}
-        />
+    <div className="min-h-screen bg-[#070a0f] text-slate-100 flex flex-col lg:flex-row selection:bg-amber-400 selection:text-slate-950 font-sans">
+      
+      {/* Sleek Left Sidebar Navigation */}
+      <Navigation
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onOpenCmdk={() => setIsCmdkOpen(true)}
+        onOpenVault={() => setIsVaultModalOpen(true)}
+        onOpenBackup={() => setIsBackupModalOpen(true)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
+        currentUser={currentUser}
+        pendingUsersCount={pendingCount}
+        openTicketsCount={openTicketsCount}
+        isVaultUnlocked={isVaultUnlocked}
+        isOnline={isOnline}
+      />
 
-        {/* Tab Viewport Routing */}
-        <main className="transition-all duration-150">
+      {/* Main Viewport Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+          
+          {/* Operations: Overview Dashboard */}
           {activeTab === 'overview' && (
             <OverviewDashboard
               currentUser={currentUser}
@@ -241,11 +242,8 @@ export function App() {
               isOnline={isOnline}
             />
           )}
-          {activeTab === 'errors' && <ErrorMatrix />}
-          {activeTab === 'cheatsheets' && <CheatSheetHub />}
-          {activeTab === 'psu' && <PsuCalculator />}
-          {activeTab === 'scripts' && <ScriptGenerator />}
-          {activeTab === 'techsuite' && <TechSuite />}
+
+          {/* Operations: Repair Job Tickets */}
           {activeTab === 'tickets' && (
             <TicketingSystem 
               onOpenInvoice={handleOpenTicketInvoice} 
@@ -253,15 +251,34 @@ export function App() {
               onUpdateTickets={setTickets}
             />
           )}
+
+          {/* Operations: Work Order Invoice Generator */}
           {activeTab === 'invoice' && (
             <InvoiceGenerator
               initialTicket={activeInvoiceTicket}
               onBackToTickets={() => handleTabChange('tickets')}
             />
           )}
-          {activeTab === 'pinouts' && <PinoutVisualizer />}
+
+          {/* Tools & Utilities: QR Suite */}
+          {activeTab === 'qr' && (
+            <QrCodeSuite 
+              tickets={tickets} 
+              onOpenTicket={() => handleTabChange('tickets')} 
+            />
+          )}
+
+          {/* Hardware & Diagnostics */}
+          {activeTab === 'errors' && <ErrorMatrix />}
+          {activeTab === 'psu' && <PsuCalculator />}
           {activeTab === 'serial' && <SerialMonitor />}
           {activeTab === 'motherboard' && <MotherboardCanvas />}
+          {activeTab === 'pinouts' && <PinoutVisualizer />}
+
+          {/* Tools & Knowledge */}
+          {activeTab === 'scripts' && <ScriptGenerator />}
+          {activeTab === 'techsuite' && <TechSuite />}
+          {activeTab === 'cheatsheets' && <CheatSheetHub />}
           {activeTab === 'kb' && (
             <KnowledgeBase
               isVaultUnlocked={isVaultUnlocked}
@@ -269,38 +286,34 @@ export function App() {
             />
           )}
           {activeTab === 'shortcuts' && <ShortcutHub />}
-          {activeTab === 'admin' && (
-            currentUser?.role === 'admin' ? (
-              <AdminCenter
-                currentUser={currentUser}
-                users={users}
-                auditLogs={auditLogs}
-                onUpdateUsers={handleUpdateUsers}
-                onAddAuditLog={handleAddAuditLog}
-              />
-            ) : (
-              <div className="bg-[#12161f]/80 border border-white/10 rounded-2xl p-12 text-center space-y-3">
-                <h3 className="text-lg font-bold text-white">Access Restricted</h3>
-                <p className="text-xs text-slate-400">Admin privilege is required to access this portal.</p>
-                <button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-amber-400 text-slate-950"
-                >
-                  Sign In as Administrator
-                </button>
-              </div>
-            )
-          )}
-        </main>
-      </div>
 
-      {/* App Footer */}
-      <footer className="no-print border-t border-white/5 py-4 text-center text-xs font-mono text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Workbench Diagnostics &amp; Software Repair Console · v3.2.0</span>
-          <span>Role-Based Access Control · IP Telemetry · Web Serial · Subnet &amp; Beep Diagnostics</span>
-        </div>
-      </footer>
+          {/* Administration & Security */}
+          {activeTab === 'admin' && (
+            <AdminCenter
+              currentUser={currentUser}
+              users={users}
+              auditLogs={auditLogs}
+              onUpdateUsers={handleUpdateUsers}
+              onAddAuditLog={handleAddAuditLog}
+            />
+          )}
+
+        </main>
+
+        {/* Global Clean Footer */}
+        <footer className="no-print border-t border-white/5 py-4 px-6 text-xs font-mono text-slate-500 bg-[#0a0d13]/60 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 font-bold">WORKBENCH PRO</span>
+            <span>·</span>
+            <span>Hardware Diagnostics &amp; Electronics Repair Suite</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span>ISO 27001 / NIST Audit Enabled</span>
+            <span>·</span>
+            <span className="text-cyan-400">Offline Cache Ready</span>
+          </div>
+        </footer>
+      </div>
 
       {/* Global Modals */}
       <AuthModal

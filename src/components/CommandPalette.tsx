@@ -38,6 +38,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   const items: SearchItem[] = [
     // Primary Tab Shortcuts
     { id: 'tab_overview', title: 'Overview Dashboard & Operations Summary', subtitle: 'Pending technician registrations, active repair queue & critical audit logs', category: 'Overview', tab: 'overview' },
+    { id: 'tab_qr', title: 'QR Code Diagnostic & Asset Tag Suite', subtitle: 'Camera scanner, WiFi connection generator, thermal asset stickers & decoder', category: 'Tools', tab: 'qr' },
     { id: 'tab_cheatsheets', title: 'Printable Cheat Sheets & Visual Reference Cards', subtitle: 'BIOS keys, EZ Debug LEDs, JFP1 front panel pinout, HDMI/DP specs & rescue commands', category: 'Cheat Sheets', tab: 'cheatsheets' },
     { id: 'tab_techsuite', title: 'Technician Multi-Tool & Subnet Calculator', subtitle: 'CIDR IPv4 subnetting, BIOS audio beepers & DNS ping latency', category: 'Tech Multi-Tool', tab: 'techsuite' },
     { id: 'tab_admin', title: 'Admin Command Center & User Management', subtitle: 'Review pending registrations with client IP, approve roles & audit logs', category: 'Admin Suite', tab: 'admin' },
