@@ -284,37 +284,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 >
                   <ShieldCheck className="w-4 h-4" /> Authenticate &amp; Launch Console
                 </button>
-
-                {/* Quick Demo Credentials */}
-                <div className="pt-2 border-t border-white/5 space-y-2">
-                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider text-center">
-                    Quick Demo Credentials
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginIdentifier('admin@workbench.local');
-                        setLoginPassword('admin123');
-                      }}
-                      className="p-2 rounded-xl bg-[#181d29] hover:bg-[#202738] border border-amber-400/30 text-[11px] font-mono text-amber-300 flex flex-col items-start text-left transition-all"
-                    >
-                      <span className="font-bold flex items-center gap-1">👑 Admin Supervisor</span>
-                      <span className="text-[10px] text-slate-400 font-normal">admin123</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginIdentifier('sarah.tech@workbench.local');
-                        setLoginPassword('tech123');
-                      }}
-                      className="p-2 rounded-xl bg-[#181d29] hover:bg-[#202738] border border-sky-400/30 text-[11px] font-mono text-sky-300 flex flex-col items-start text-left transition-all"
-                    >
-                      <span className="font-bold flex items-center gap-1">🔧 Lead Technician</span>
-                      <span className="text-[10px] text-slate-400 font-normal">tech123</span>
-                    </button>
-                  </div>
-                </div>
               </form>
             )}
 

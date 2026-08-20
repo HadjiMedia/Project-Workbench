@@ -238,36 +238,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             >
               <ShieldCheck className="w-4 h-4" /> Authenticate &amp; Access Suite
             </button>
-
-            <div className="pt-2 border-t border-white/5 space-y-1.5">
-              <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider text-center">
-                Quick Demo Credentials
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginIdentifier('admin@workbench.local');
-                    setLoginPassword('admin123');
-                  }}
-                  className="p-1.5 rounded-lg bg-[#181d29] hover:bg-[#202738] border border-amber-400/30 text-[10px] font-mono text-amber-300 flex flex-col items-start text-left"
-                >
-                  <span className="font-bold">👑 Admin Supervisor</span>
-                  <span className="text-[9px] text-slate-400 font-normal">admin123</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginIdentifier('sarah.tech@workbench.local');
-                    setLoginPassword('tech123');
-                  }}
-                  className="p-1.5 rounded-lg bg-[#181d29] hover:bg-[#202738] border border-sky-400/30 text-[10px] font-mono text-sky-300 flex flex-col items-start text-left"
-                >
-                  <span className="font-bold">🔧 Lead Technician</span>
-                  <span className="text-[9px] text-slate-400 font-normal">tech123</span>
-                </button>
-              </div>
-            </div>
           </form>
         )}
 

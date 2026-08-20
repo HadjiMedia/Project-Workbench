@@ -2,6 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TabId, JobTicket, User, SecurityAuditLog } from './types';
 import { INITIAL_USERS, INITIAL_AUDIT_LOGS } from './data/usersData';
 import { INITIAL_TICKETS } from './data/sampleTickets';
+import { 
+  subscribeToUsers, 
+  subscribeToAuditLogs, 
+  subscribeToTickets, 
+  saveUserToCloud, 
+  updateUsersInCloud,
+  deleteUserFromCloud,
+  addAuditLogToCloud, 
+  saveTicketsInCloud,
+  seedInitialDataIfEmpty
+} from './services/firestoreService';
 
 import { Navigation } from './components/Navigation';
 import { OverviewDashboard } from './components/OverviewDashboard';
@@ -35,7 +46,7 @@ export function App() {
     }
   });
 
-  // User Authentication & Directory State
+  // User Authentication & Directory State (Backed by Cloud Firestore Real-time Sync)
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem('wb_users');
@@ -73,7 +84,50 @@ export function App() {
     }
   });
 
-  // Persist State
+  // Setup Firestore Real-time Subscriptions across all tabs / browsers
+  useEffect(() => {
+    seedInitialDataIfEmpty();
+
+    const unsubUsers = subscribeToUsers((cloudUsers) => {
+      if (cloudUsers && cloudUsers.length > 0) {
+        setUsers(cloudUsers);
+        localStorage.setItem('wb_users', JSON.stringify(cloudUsers));
+
+        // If current user's status or role changed in cloud, update local current user session
+        setCurrentUser(prev => {
+          if (!prev) return null;
+          const matched = cloudUsers.find(u => u.id === prev.id);
+          if (matched) {
+            localStorage.setItem('wb_current_user', JSON.stringify(matched));
+            return matched;
+          }
+          return prev;
+        });
+      }
+    });
+
+    const unsubAudit = subscribeToAuditLogs((cloudLogs) => {
+      if (cloudLogs && cloudLogs.length > 0) {
+        setAuditLogs(cloudLogs);
+        localStorage.setItem('wb_audit_logs', JSON.stringify(cloudLogs));
+      }
+    });
+
+    const unsubTickets = subscribeToTickets((cloudTickets) => {
+      if (cloudTickets && cloudTickets.length > 0) {
+        setTickets(cloudTickets);
+        localStorage.setItem('wb_repair_tickets', JSON.stringify(cloudTickets));
+      }
+    });
+
+    return () => {
+      unsubUsers();
+      unsubAudit();
+      unsubTickets();
+    };
+  }, []);
+
+  // Persist State locally for fast bootstrap
   useEffect(() => {
     localStorage.setItem('wb_users', JSON.stringify(users));
   }, [users]);
@@ -129,9 +183,12 @@ export function App() {
   };
 
   // Auth Handlers
-  const handleLoginSuccess = (user: User) => {
+  const handleLoginSuccess = async (user: User) => {
     setCurrentUser(user);
     setUsers(prev => prev.map(u => u.id === user.id ? user : u));
+
+    // Update last login in Cloud
+    await saveUserToCloud(user);
 
     const log: SecurityAuditLog = {
       id: 'log_' + Date.now(),
@@ -145,9 +202,10 @@ export function App() {
       severity: 'info'
     };
     setAuditLogs(prev => [log, ...prev]);
+    await addAuditLogToCloud(log);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (currentUser) {
       const log: SecurityAuditLog = {
         id: 'log_' + Date.now(),
@@ -161,25 +219,51 @@ export function App() {
         severity: 'info'
       };
       setAuditLogs(prev => [log, ...prev]);
+      await addAuditLogToCloud(log);
     }
     setCurrentUser(null);
   };
 
-  const handleRegisterSubmit = (newUser: User, auditLog: SecurityAuditLog) => {
+  // Handle new user registration and push to Cloud Firestore immediately
+  const handleRegisterSubmit = async (newUser: User, auditLog: SecurityAuditLog) => {
     setUsers(prev => [newUser, ...prev]);
     setAuditLogs(prev => [auditLog, ...prev]);
+    
+    // Write directly to cloud database so all admin browser sessions receive live approval notification
+    await saveUserToCloud(newUser);
+    await addAuditLogToCloud(auditLog);
   };
 
-  const handleUpdateUsers = (updatedUsers: User[]) => {
+  // Admin user directory updates (approvals, role changes, suspensions)
+  const handleUpdateUsers = async (updatedUsers: User[]) => {
     setUsers(updatedUsers);
     if (currentUser) {
       const refreshed = updatedUsers.find(u => u.id === currentUser.id);
       if (refreshed) setCurrentUser(refreshed);
     }
+    await updateUsersInCloud(updatedUsers);
   };
 
-  const handleAddAuditLog = (log: SecurityAuditLog) => {
+  // Admin user deletion
+  const handleDeleteUser = async (userId: string) => {
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    await deleteUserFromCloud(userId);
+  };
+
+  const handleDeleteUsers = async (userIds: string[]) => {
+    setUsers(prev => prev.filter(u => !userIds.includes(u.id)));
+    const { deleteUsersFromCloud } = await import('./services/firestoreService');
+    await deleteUsersFromCloud(userIds);
+  };
+
+  const handleAddAuditLog = async (log: SecurityAuditLog) => {
     setAuditLogs(prev => [log, ...prev]);
+    await addAuditLogToCloud(log);
+  };
+
+  const handleUpdateTickets = async (updatedTickets: JobTicket[]) => {
+    setTickets(updatedTickets);
+    await saveTicketsInCloud(updatedTickets);
   };
 
   // Keyboard shortcut listener for Ctrl+K
@@ -262,7 +346,7 @@ export function App() {
             <TicketingSystem 
               onOpenInvoice={handleOpenTicketInvoice} 
               tickets={tickets}
-              onUpdateTickets={setTickets}
+              onUpdateTickets={handleUpdateTickets}
             />
           )}
 
@@ -308,6 +392,7 @@ export function App() {
               users={users}
               auditLogs={auditLogs}
               onUpdateUsers={handleUpdateUsers}
+              onDeleteUsers={handleDeleteUsers}
               onAddAuditLog={handleAddAuditLog}
             />
           )}
@@ -322,9 +407,12 @@ export function App() {
             <span>Hardware Diagnostics &amp; Electronics Repair Suite</span>
           </div>
           <div className="flex items-center gap-3">
-            <span>ISO 27001 / NIST Audit Enabled</span>
+            <span className="text-emerald-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Cloud Live Sync
+            </span>
             <span>·</span>
-            <span className="text-cyan-400">Offline Cache Ready</span>
+            <span>ISO 27001 / NIST Audit Enabled</span>
           </div>
         </footer>
       </div>

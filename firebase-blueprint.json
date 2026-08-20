@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Technician or Administrator profile in Workbench Pro",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "fullName": { "type": "string" },
+        "techCallsign": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "lead_tech", "bench_tech", "apprentice", "viewer"] },
+        "status": { "type": "string", "enum": ["active", "pending", "suspended"] },
+        "passwordHash": { "type": "string" },
+        "registeredAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" },
+        "lastLoginIp": { "type": "string" },
+        "specialties": { "type": "string" },
+        "approvedBy": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "avatarUrl": { "type": "string" }
+      },
+      "required": ["id", "email", "fullName", "techCallsign", "role", "status", "passwordHash", "registeredAt"]
+    },
+    "SecurityAuditLog": {
+      "title": "SecurityAuditLog",
+      "description": "System security audit and telemetry log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "ip": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "details": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "critical"] }
+      },
+      "required": ["id", "timestamp", "userId", "userEmail", "action", "ip", "details", "severity"]
+    },
+    "JobTicket": {
+      "title": "JobTicket",
+      "description": "Hardware and software diagnostic work order repair ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ticketNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "deviceModel": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "issueCategory": { "type": "string" },
+        "problemDescription": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "assignedTech": { "type": "string" },
+        "assignedTechId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "notes": { "type": "string" },
+        "diagnosticChecklist": { "type": "string" }
+      },
+      "required": ["id", "ticketNumber", "customerName", "deviceModel", "problemDescription", "status", "priority", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/wb_users/{userId}": {
+      "schema": "User",
+      "description": "Workbench technician directory and authentication documents"
+    },
+    "/wb_audit_logs/{logId}": {
+      "schema": "SecurityAuditLog",
+      "description": "Security audit and access logs"
+    },
+    "/wb_tickets/{ticketId}": {
+      "schema": "JobTicket",
+      "description": "Centralized repair work orders and job tickets"
+    }
+  }
+}
