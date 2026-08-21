@@ -437,6 +437,24 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
           
           <button
+            onClick={() => onNavigateTab('manual')}
+            className="p-3.5 rounded-xl bg-gradient-to-br from-amber-500/10 via-[#181d29] to-[#181d29] hover:bg-[#202738] border border-amber-500/30 hover:border-amber-500/60 text-left transition-all group flex flex-col justify-between shadow-lg shadow-amber-500/5"
+          >
+            <div className="flex items-center justify-between text-amber-400 mb-2">
+              <span className="flex items-center gap-1.5 font-mono text-[9px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">
+                NEW ENCYCLOPEDIA
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <div className="font-bold text-white group-hover:text-amber-300 transition-colors">
+              DIY Repair Master Manual
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1">
+              300-pg guide: component repairs, decision trees, Ghost cloning &amp; 15+ bench solvers
+            </div>
+          </button>
+
+          <button
             onClick={() => onNavigateTab('errors')}
             className="p-3.5 rounded-xl bg-[#181d29] hover:bg-[#202738] border border-white/5 hover:border-rose-500/40 text-left transition-all group flex flex-col justify-between"
           >

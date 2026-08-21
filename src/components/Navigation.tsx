@@ -69,6 +69,13 @@ export const Navigation: React.FC<NavigationProps> = ({
     {
       title: 'HARDWARE & DIAGNOSTICS',
       items: [
+        { 
+          id: 'manual', 
+          label: 'DIY Repair Manual', 
+          icon: BookOpen,
+          badge: '300-PG',
+          badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px]'
+        },
         { id: 'errors', label: 'Windows Error Matrix', icon: AlertTriangle },
         { id: 'psu', label: 'PSU Rail Calculator', icon: Zap },
         { id: 'serial', label: 'Web Serial POST', icon: Cable },

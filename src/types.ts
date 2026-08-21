@@ -2,6 +2,7 @@ export type TabId =
   | 'overview'
   | 'tickets'
   | 'invoice'
+  | 'manual'
   | 'qr'
   | 'errors'
   | 'psu'

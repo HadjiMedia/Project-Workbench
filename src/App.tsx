@@ -31,6 +31,7 @@ import { PinoutVisualizer } from './components/PinoutVisualizer';
 import { SerialMonitor } from './components/SerialMonitor';
 import { MotherboardCanvas } from './components/MotherboardCanvas';
 import { KnowledgeBase } from './components/KnowledgeBase';
+import { DiyRepairHandbook } from './components/DiyRepairHandbook';
 import { ShortcutHub } from './components/ShortcutHub';
 import { CheatSheetHub } from './components/CheatSheetHub';
 import { AdminCenter } from './components/AdminCenter';
@@ -346,6 +347,7 @@ export function App() {
               {activeTab === 'overview' && 'Workbench Operational Dashboard'}
               {activeTab === 'tickets' && 'Job Intake & Diagnostic Tickets'}
               {activeTab === 'invoice' && 'Work Order & Invoice Generator'}
+              {activeTab === 'manual' && 'DIY Computer Repair & Diagnostics Master Manual (300-Page Reference)'}
               {activeTab === 'qr' && 'QR Intake & Tagging Suite'}
               {activeTab === 'errors' && 'POST & BlueScreen Diagnostics Matrix'}
               {activeTab === 'psu' && 'Power Supply & Rail Headroom Calculator'}
@@ -426,6 +428,9 @@ export function App() {
               onOpenTicket={() => handleTabChange('tickets')} 
             />
           )}
+
+          {/* Master DIY Computer Repair Handbook */}
+          {activeTab === 'manual' && <DiyRepairHandbook />}
 
           {/* Hardware & Diagnostics */}
           {activeTab === 'errors' && <ErrorMatrix />}
